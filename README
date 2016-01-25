@@ -1,0 +1,15 @@
+This directory contains grand solution software, which deduces stellar
+parameters by fitting stellar spectra obtained with an iodine cell.
+
+The fitting code 'grandsol/fort/grand' determines:
+  intrinsic stellar spectrum (a.k.a. deconvolved template)
+  stellar radial velocity for each epoch
+  wavelength solutions for each epoch
+  crude continuum normalization for each epoch
+  line spread functions across the echelle format for each epoch
+
+Brief descriptions of 'grandsol' subdirectories:
+  'fort' - fortran source code for the fitting code 'grand.F'
+  'gref' - reference files used by the fitting code 'grand'
+
+See README files in each subdirectory for more information.
