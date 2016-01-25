@@ -10,6 +10,15 @@ The fitting code 'grandsol/fort/grand' determines:
 
 Brief descriptions of 'grandsol' subdirectories:
   'fort' - fortran source code for the fitting code 'grand.F'
-  'gref' - reference files used by the fitting code 'grand'
+  'fref' - reference files used by the fortran code 'grand'
 
 See README files in each subdirectory for more information.
+
+Sample environment variables and aliases for tcsh:
+  setenv GRAND /Users/valenti/git/grandsol
+  setenv GRAND_REFDIR $GRAND/fref
+  setenv GRAND_IREFDIR $GRAND/iref
+  setenv GRANDSOL_IDL_PATH ${MINIMAL_IDL_PATH}:+$GRAND/idl
+  alias idlgr "env IDL_PATH=$GRANDSOL_IDL_PATH $IDL_DIR/bin/idl"
+  alias grand ~/git/grandsol/fort/grand
+

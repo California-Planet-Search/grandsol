@@ -1,0 +1,11 @@
+This directory contains reference files used by IDL routines that are part
+of the grand solution code base. IDL code is used to create simulated
+observations and to assess output from 'grand'.
+
+Set the environment variable $GRAND_IREFDIR to point at this directory.
+IDL code should use this environment variable to locate reference data.
+
+Subdirectories with reference data used by simobs_one.pro and simobs_set.pro:
+  'ech'  - echelle spectrograph reference files, e.g., wavelengths
+  'elsf' - effective line spread functions
+  'iod'  - FTS scans of iodine cells

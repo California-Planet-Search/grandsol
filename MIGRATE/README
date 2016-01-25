@@ -1,0 +1,4 @@
+These IDL procedures are not part of the canonical code base for the grand
+solution. They are provided only to facilitate migration from Jeff's local
+code base to the shared git repository. These routines should be migrated
+into the canonical 'idl' directory or deleted.

@@ -1,0 +1,11 @@
+Reference files that describe echelle spectrograph characteristics.
+Used by idl/simobs_one.pro, which creates simulated observations.
+simobs.pro looks for echelle reference files in $GRAND_IREFDIR/ech
+The nominal value of $GRAND_IREFDIR is $GRAND/iref
+
+Echelle reference files are named <ech>.<type> where:
+  <ech>  is the name of the echelle:
+    'hires' - Keck HIRES echelle with the new detectors
+  <type> is the type of reference data:
+    'wave'  - Nominal wavelength solution
+    'norm'  - Nominal order response (a.k.a. blaze) function
