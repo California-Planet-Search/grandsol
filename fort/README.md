@@ -34,7 +34,20 @@ grand obslist sunsim 8 out=sunsim.08.log 211111 fudge-
 grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 ```
 
-### output file format from `grand`
+
+### input file format (`obslist`)
+HEADER = 
+```
+VSYST = 0 m/s    # Systemic velocity
+RJDIR = "/net/calla.ifa.hawaii.edu/Volumes/indicium/u/bfulton/Dropbox/code/grandsol/idl/"    # output directory
+```
+- col0 = observation index
+- col1 = file name?
+- col2 = barycentric correction? (m/s)
+- col3 = initial velocity guess? (m/s)
+
+
+### output file format
 - .vel files:
   - col0 = 
   - col1 = 
