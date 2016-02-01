@@ -39,7 +39,7 @@ grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 HEADER = 
 ```
 VSYST = 0 m/s    # Systemic velocity
-RJDIR = "/net/calla.ifa.hawaii.edu/Volumes/indicium/u/bfulton/Dropbox/code/grandsol/idl/"    # output directory
+RJDIR = "~/code/grandsol/idl/"    # output directory
 ```
 - col0 = observation index
 - col1 = file name?
