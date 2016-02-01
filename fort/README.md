@@ -36,7 +36,7 @@ grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 
 
 ### input file format (`obslist`)
-HEADER = 
+2 HEADER lines:
 ```
 VSYST = 0 m/s    # Systemic velocity
 RJDIR = "~/code/grandsol/idl/"    # output directory
