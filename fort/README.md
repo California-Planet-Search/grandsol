@@ -39,7 +39,7 @@ grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 
 ### Observation List (e.g., `obslist`)
 
-###### Header
+#### Header
 | **Example** | **Default** | **Description** | **Variable** |
 | :--- | :--- | :--- | :--- |
 | `VSYST = -16400 m/s` | *Mandatory* | Radial velocity of center of mass | `velsys` |
@@ -50,7 +50,7 @@ grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 | **Column** | **Description** | **Example** | **Variable** |
 | :---: | :--- | :--- | :--- |
 | **0** | Observation index | `001` | `n` |
-| **1** | Input observation file | `star.001` | `FILEI` |
+| **1** | Input _observation file_ | `star.001` | `FILEI` |
 | **2** | Unused | `0` | `d` |
 | **3** | Barycentric correction (m/s) | `29943.73508` | `barycorr` |
 | **4** | Observed radial velocity around barycenter of distant system (m/s) | `-31.74` | `vorb` |
@@ -60,12 +60,12 @@ Otherwise `vorb` is set to zero, which is the _null hypothesis_.
 
 See fortran subroutine `read_raw()` for more information.
 
-### Observation Files (e.g., `hd10700.001`)
+### Observation File (e.g., `hd10700.001`)
 
-Input observation files must be in `.dsk` format,
+An input observation file must be in `.dsk` format,
 as produced by the reduction pipeline or `wdsk_simobs.pro`.
 
-Use an **observation list** to specify a set of inut observation files.
+Use an _observation list_ to specify a set of inut observation files.
 
 See fortran subroutine `rdsk()` for more information.
 This routine will need to be generalized.
@@ -74,12 +74,44 @@ Orders 1-12 (out of 0-15) are divided by a hard-coded polynomial approximation o
 
 ## Output Files
 
-- .vel files:
-  - col0 = 
-  - col1 = 
-  - col2 = 
-  - col3 = 
-  - col4 =
+### Velocities
+
+#### Header
+None.
+
+#### Body
+| **Column** | **Description** | **Example** | **Variable** |
+| :---: | :--- | :--- | :--- |
+| **0** | Observation index | `001` | `n` |
+| **1** | RV/c for bulk shift of the entire order | `0.000073135` | `zn` |
+| **2** | BC/c | `0.0000731371` | `z0` |
+| **3** | mean RV/c from spectral lines after sigma clipping | `0.0000731375` | `zbarn` |
+| **4** | standard deviation of RV/c from spectral lines | `0.0000000047` | `zsign` |
+
+#### Formulae
+```
+vbarn = c * ((1+zbarn)^2    - 1) / ((1+zbarn)^2    + 1)
+
+V = c * ((1+Z)^2 - 1) / ((1+Z)^2 + 1)
+
+uV^2 = (dV/dZ)^2 * uZ^2
+
+       ((1+Z)^2 + 1) * (2*(1+Z)) - ((1+Z)^2 - 1) * (2*(1+Z))
+     = ----------------------------------------------------- * uZ^2
+                           ((1+Z)^2 + 1)^2
+
+       2*(1+Z) * ((1+Z)^2 + 1 - (1+Z)^2 + 1)
+     = ------------------------------------- * uZ^2
+                  ((1+Z)^2 + 1)^2
+
+           4*(1+Z)
+     = --------------- * uZ^2
+       ((1+Z)^2 + 1)^2
+```
+
+
+### Other files
+
 - .nim files:
   - col0 = 
   - col1 = 
