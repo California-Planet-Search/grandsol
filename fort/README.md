@@ -60,7 +60,7 @@ Otherwise `vorb` is set to zero, which is the _null hypothesis_.
 
 See fortran subroutine `read_raw()` for more information.
 
-### Observation File (e.g., `hd10700.001`)
+### Observation File (e.g., `star.001`)
 
 An input observation file must be in `.dsk` format,
 as produced by the reduction pipeline or `wdsk_simobs.pro`.
@@ -74,7 +74,7 @@ Orders 1-12 (out of 0-15) are divided by a hard-coded polynomial approximation o
 
 ## Output Files
 
-### Velocities
+### Velocity File (e.g. `star.08.10.vel`)
 
 #### Header
 None.
@@ -85,8 +85,20 @@ None.
 | **0** | Observation index | `001` | `n` |
 | **1** | RV/c for bulk shift of the entire order | `0.000073135` | `zn` |
 | **2** | BC/c | `0.0000731371` | `z0` |
-| **3** | mean RV/c from spectral lines after sigma clipping | `0.0000731375` | `zbarn` |
+| **3** | mean of RV/c from spectral lines after sigma clipping | `0.0000731375` | `zbarn` |
 | **4** | standard deviation of RV/c from spectral lines | `0.0000000047` | `zsign` |
+
+Symbols:
+- RV = radial velocity
+- BC = barycentric correction
+- c = speed of light
+- z = velocity divided by the speed of light
+
+Grand returns two estimates for radial velocity (RV).
+Column 1 is the RV/c that best matches the template to an entire observed order.
+Column 3 is the sigma-clipped mean of many RV/c values,
+each matching the template to a different line feature in the order.
+Both estimates seem to work well, so at this point we don't have a preference.
 
 #### Formulae
 ```
@@ -108,6 +120,8 @@ uV^2 = (dV/dZ)^2 * uZ^2
      = --------------- * uZ^2
        ((1+Z)^2 + 1)^2
 ```
+
+See fortran subroutine `save_vel()` for more information.
 
 
 ### Other files
