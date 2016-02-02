@@ -35,16 +35,24 @@ grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 ```
 
 
-### input file format (`obslist`)
-2 HEADER lines:
-```
-VSYST = 0 m/s    # Systemic velocity
-RJDIR = "~/code/grandsol/idl/"    # output directory
-```
+### input files
+#### `obslist`
+##### Header Description
+
+| **Example** | **Default** | **Description** |
+| :--- | :--- | :--- |
+| `VSYST = -16400 m/s` | *Mandatory* | Radial velocity of center of mass |
+| `RJDIR = "\Users\valenti\obs\"` | `".\"` | Directory containing observations to fit |
+| `METEOR \Users\valenti\ref\meteor.dat` | `NONE` | File containing meteor location |
+
+##### Body Description
+
 - col0 = observation index
 - col1 = file name?
 - col2 = barycentric correction? (m/s)
 - col3 = initial velocity guess? (m/s)
+
+See fortran subroutine `read_raw`
 
 
 ### output file format
