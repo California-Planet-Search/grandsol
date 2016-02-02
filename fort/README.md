@@ -36,11 +36,10 @@ grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 
 
 ## Input Files
-### Observation List (`obslist`)
-#### Header
 
-See fortran subroutine `read_raw` for more information.
+### Observation List (e.g., `obslist`)
 
+###### Header
 | **Example** | **Default** | **Description** | **Variable** |
 | :--- | :--- | :--- | :--- |
 | `VSYST = -16400 m/s` | *Mandatory* | Radial velocity of center of mass | `velsys` |
@@ -48,23 +47,33 @@ See fortran subroutine `read_raw` for more information.
 | `METEOR \Users\valenti\ref\meteor.dat` | `NONE` | File describing meteor location | `METEORFILE` |
 
 #### Body
-
 | **Column** | **Description** | **Example** | **Variable** |
 | :---: | :--- | :--- | :--- |
 | **0** | Observation index | `001` | `n` |
 | **1** | Input observation file | `star.001` | `FILEI` |
 | **2** | Unused | `0` | `d` |
 | **3** | Barycentric correction (m/s) | `29943.73508` | `barycorr` |
-| **4** | Observed radial velocity around barycenter of distant system (m/s) | `29943.73508` | `vorb` |
+| **4** | Observed radial velocity around barycenter of distant system (m/s) | `-31.74` | `vorb` |
 
-Column 4 is required in `grand` is called with the `vorb+` argument.
+Column 4 is required if `grand` is called with the `vorb+` argument.
 Otherwise `vorb` is set to zero, which is the _null hypothesis_.
 
-### Observation Files
+See fortran subroutine `read_raw()` for more information.
 
-Observations must be in the `.dsk` format, which is produced by the reduction pipeline or `wdsk_simobs.pro`.
+### Observation Files (e.g., `hd10700.001`)
+
+Input observation files must be in `.dsk` format,
+as produced by the reduction pipeline or `wdsk_simobs.pro`.
+
+Use an **observation list** to specify a set of inut observation files.
+
+See fortran subroutine `rdsk()` for more information.
+This routine will need to be generalized.
+Spectra are assumed to consist of 16 echelle orders, each with 4021 pixels.
+Orders 1-12 (out of 0-15) are divided by a hard-coded polynomial approximation of the HIRES blaze function.
 
 ## Output Files
+
 - .vel files:
   - col0 = 
   - col1 = 
