@@ -1,4 +1,4 @@
-## Fortran code for the Grand Solution Doppler code
+# Fortran code for the Grand Solution Doppler code
 
 ## Environment variables
 
@@ -35,27 +35,36 @@ grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 ```
 
 
-### input files
-#### `obslist`
-##### Header Description
+## Input Files
+### Observation List (`obslist`)
+#### Header
 
-| **Example** | **Default** | **Description** |
-| :--- | :--- | :--- |
-| `VSYST = -16400 m/s` | *Mandatory* | Radial velocity of center of mass |
-| `RJDIR = "\Users\valenti\obs\"` | `".\"` | Directory containing observations to fit |
-| `METEOR \Users\valenti\ref\meteor.dat` | `NONE` | File containing meteor location |
+See fortran subroutine `read_raw` for more information.
 
-##### Body Description
+| **Example** | **Default** | **Description** | **Variable** |
+| :--- | :--- | :--- | :--- |
+| `VSYST = -16400 m/s` | *Mandatory* | Radial velocity of center of mass | `velsys` |
+| `RJDIR = "\Users\valenti\obs\"` | `".\"` | Directory containing input observations | `RJDIR` |
+| `METEOR \Users\valenti\ref\meteor.dat` | `NONE` | File describing meteor location | `METEORFILE` |
 
-- col0 = observation index
-- col1 = file name?
-- col2 = barycentric correction? (m/s)
-- col3 = initial velocity guess? (m/s)
+#### Body
 
-See fortran subroutine `read_raw`
+| **Column** | **Description** | **Example** | **Variable** |
+| :---: | :--- | :--- | :--- |
+| **0** | Observation index | `001` | `n` |
+| **1** | Input observation file | `star.001` | `FILEI` |
+| **2** | Unused | `0` | `d` |
+| **3** | Barycentric correction (m/s) | `29943.73508` | `barycorr` |
+| **4** | Observed radial velocity around barycenter of distant system (m/s) | `29943.73508` | `vorb` |
 
+Column 4 is required in `grand` is called with the `vorb+` argument.
+Otherwise `vorb` is set to zero, which is the _null hypothesis_.
 
-### output file format
+### Observation Files
+
+Observations must be in the `.dsk` format, which is produced by the reduction pipeline or `wdsk_simobs.pro`.
+
+## Output Files
 - .vel files:
   - col0 = 
   - col1 = 
