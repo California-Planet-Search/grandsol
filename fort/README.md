@@ -49,7 +49,7 @@ grand obslist2 sunsim2 8 out=sunsim2.08.log 211111 fudge- vorb+
 #### Body
 | **Column** | **Description** | **Example** | **Variable** |
 | :---: | :--- | :--- | :--- |
-| **0** | Observation index | `001` | `n` |
+| **0** | Observation index (start with 001, not 000) | `001` | `n` |
 | **1** | Input _observation file_ | `star.001` | `FILEI` |
 | **2** | Unused | `0` | `d` |
 | **3** | Barycentric correction (m/s) | `29943.73508` | `barycorr` |
