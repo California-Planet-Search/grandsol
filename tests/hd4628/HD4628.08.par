@@ -1,0 +1,32 @@
+# REQUIRED ARGUMENTS
+obslist_file: obslist
+label: HD4628
+order: 8
+
+# OPTIONAL ARGUMENTS
+logfile: <STDOUT>
+nito: 0
+nitf: 10
+fudge: T
+vorb: F
+output_vel: 1
+output_tem: 1
+output_mod: 1
+output_lsf: 1
+output_nrm: 1
+output_lin: 1
+
+# OBSERVATION LIST FILE
+nobs: 0
+velsys: -10140.00
+minbc: +99999.00
+maxbc: -99999.00
+obsdir: /mir3/iodspec/
+obslist_file: obslist
+meteor_file: NONE
+
+# ENVIRONMENT VARIABLES
+GRAND_REFDIR: /Users/bfulton/code/grandsol/fref
+
+# REFERENCE FILES
+solar_file: /Users/bfulton/code/grandsol/fref/nsosun.tem

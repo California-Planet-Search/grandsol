@@ -168,7 +168,7 @@ c
 c may be needed if any raw disk files are read in ; I can worry about
 c big/little endian issues
 c
-#define _LINUX_ .true.
+#define _LINUX_ .false.
  
  
 c------------------------------------------------------------------------------

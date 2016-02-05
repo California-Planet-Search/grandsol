@@ -1,0 +1,10 @@
+star = 'sun'
+iod = 'keck-nso-52.5'
+elsf = 'jay2011'
+ech = 'hires'
+bcmax = 30000.00 m/s
+rvk = 3.00 m/s
+vsys = 3.00 m/s
+ston = 200
+nobs = 100
+seed_entry = 200
