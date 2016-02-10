@@ -30,7 +30,10 @@ def write_obslist(df, outfile='obslist'):
 def read_vel(infile):
     zdf = pd.read_csv(infile, sep=' ', names=['ind', 'zn', 'z0', 'zbarn', 'zsign']).set_index('ind')
 
-    zdf['vbarn'],zdf['uvbarn'] = relativity.redshift_to_vel(zdf['zbarn']-zdf['z0'], zdf['zsign'])
-    zdf['veln'] = relativity.z2v(zdf['zn']-zdf['z0'])
+    zdf['vbarn'],zdf['uvbarn'] = relativity.redshift_to_vel(zdf['zbarn'], zdf['zsign'])
+    zdf['veln'] = relativity.z2v(zdf['zn'])
+    zdf['bc'] = relativity.z2v(zdf['z0'])
     
     return zdf
+
+    
