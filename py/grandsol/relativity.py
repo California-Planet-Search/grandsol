@@ -34,7 +34,7 @@ def redshift_to_vel(z, uz=0):
 
     return (v, uv)
 
-class RV:
+class RV():
     """
     Radial Velocity object designed to handle relativistic arithmatic.
     Can be constructed by giving velocities or Z. Velocities should be in m/s
