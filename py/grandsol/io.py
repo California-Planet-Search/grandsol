@@ -1,6 +1,8 @@
 import pandas as pd
+import numpy as np
 import os
 import grandsol.relativity as relativity
+import grandsol
 
 def get_observations(star):
     """
@@ -21,7 +23,7 @@ def get_observations(star):
     star = kbc[(kbc['name'].str.upper() == star.upper()) & (kbc['type'] == 'o')]
     return pd.DataFrame(star)
 
-def write_obslist(df, sysvel, outfile='obslist', vorb=0):
+def write_obslist(df, sysvel, outfile='obslist', vorb=None):
     """
     Write list of observations in the format that grand likes.
 
@@ -40,17 +42,19 @@ def write_obslist(df, sysvel, outfile='obslist', vorb=0):
     f = open(outfile, 'w')
 
     df['fill'] = 0
-    if 'vorb' not in df.columns:
+    if 'vorb' not in df.columns or isinstance(vorb, type(None)):
+        df['vorb'] = 0
+    else:
         df['vorb'] = vorb
 
     odf = df.sort_values('jd').reset_index(drop=True)
     odf['ind'] = odf.index.values + 1
         
-    header = 'VSYST = -10140 m/s\nRJDIR = "%s/"\n' % (os.environ['GRAND_DATADIR'])
+    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\n' % (sysvel, os.environ['GRAND_DATADIR'])
     body = odf.to_string(index=False, header=False,
                          columns=['ind', 'obs','fill', 'bc', 'vorb'],
                          formatters=['{:03d}'.format, '{:s}'.format, '{:d}'.format, '{:.5f}'.format, '{:.5f}'.format])
-
+    
     print >>f, header+body
     f.close()
 
@@ -78,4 +82,38 @@ def read_vel(infile):
     
     return zdf
 
+def combine_orders(runname, obdf, orders):
+    """
+    Combine velocities from multiple orders by mean and merge with observation information.
+
+    Parameters
+    ----------
+    runname : str : name of current grand run
+    obdf : DataFrame : observation data frame from grandsol.io.write_obslist
+    orders : list : list of orders to combine
+
+
+    Returns
+    ---------
+    vdf : DataFrame : Same as obdf with mean velocity (mnvel) and velocity uncertainty (errvel) columns added
+    """
     
+    mnvel = np.zeros((len(orders),len(obdf)))
+    zarr = np.zeros((len(orders),len(obdf)))
+
+    for i,o in enumerate(orders):
+        vdf = grandsol.io.read_vel('%s.%02d.99.vel' % (runname,o))
+        mnvel[i,:] = vdf['veln']
+        zarr[i,:] = vdf['zn']
+
+    rv = relativity.RV(z=zarr)
+    bc = relativity.RV(z=vdf['z0'].values)
+
+    relvel = rv - bc
+
+    vdf['mnvel'] = relvel.mean().vel.values()
+    vdf['errvel'] = mnvel.std(axis=0) / np.sqrt(len(orders))
+
+    mdf = pd.merge(vdf, obdf, left_index=True, right_on='ind')
+    
+    return mdf
