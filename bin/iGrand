@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+import argparse
+import subprocess
+import os
+import pp
+
+import grandsol
+
+
+def args():
+    """
+    Parse command line arguments.
+    """
+    
+    parser = argparse.ArgumentParser(description='Run iterative Grand Solution doppler analysis.')
+    parser.add_argument(metavar='stars',dest='stars',action='store',help='Star or list of stars to analyze.',default=[], nargs='*')
+    parser.add_argument(metavar='sysvel',dest='sysvel',action='store',help='Systemic radial velocity to star.',default=0, type=float)
+    parser.add_argument('--orders',dest='orders',action='store',help='List of spectral orders to analyze.',default=range(14))
+    parser.add_argument('--local', dest='local',action='store_true',help='Run on local computer only. [True]',default=True)
+    parser.add_argument('--ncpus',dest='ncpus',action='store',help='Number of local CPUs to utilize. [20]',default=20, type=int)
+    parser.add_argument('--niter',dest='niter',action='store',help='Number of outer loop iterations.',default=3, type=int)
+    
+    opt = parser.parse_args()
+    
+    return opt
+
+
+if __name__ == '__main__':
+
+    opt = args()
+
+    if not opt.local:
+        server = pp.Server(ppservers=("*",), secret='gj3470b', ncpus=opt.ncpus)
+        time.sleep(2)
+    elif opt.local:
+        server = pp.Server(ncpus=opt.ncpus)
+
+    nodes = server.get_active_nodes()
+    print "Active nodes:\nServer                         NCPUS\n-------------------------------------"
+    for n in nodes.keys():
+        try:
+            host = socket.gethostbyaddr(n.split(":")[0])[0]
+        except:
+            host = n.split(":")[0]
+        print "%s\t%s" % (host.ljust(30), nodes[n])
+    print "-------------------------------------\n"
+
+
+    for star in opt.stars:
+        print "Running iGrand for star:", star
+        opt.star = star
+        grandsol.driver.run_iterations(opt, server)
+    
+
+        
