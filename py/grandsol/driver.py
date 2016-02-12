@@ -17,14 +17,14 @@ def execute(cmd, cwd, verbose=True):
     stdout, stderr = p.communicate()
     
     lock = subprocess.Popen(["echo 'End Time: '`date` >> order_%02d.run" % o], shell=True)
-    time.sleep(1)
+    time.sleep(2)
     lock = subprocess.Popen(["mv order_%02d.run order_%02d.done" % (o,o)], shell=True)
     
 def run_orders(runname, obslist, ppserver=None, overwrite=False, orders=[1,2,3,4,5,6,7,8,9,10,11,12]):
     jobs = []
     for o in orders:
         cwd = os.getcwd()
-        cmd = "grand %s %s %d 111111 out=%s.%02d.log" % (obslist, runname, o, runname, o)
+        cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ fudge+ nitf=10" % (obslist, runname, o, runname, o)
         if overwrite or not os.path.isfile('order_%02d.done' % o): 
             if ppserver == None:
                 execute(cmd, cwd)

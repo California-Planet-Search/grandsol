@@ -23,7 +23,7 @@ def get_observations(star):
     star = kbc[(kbc['name'].str.upper() == star.upper()) & (kbc['type'] == 'o')]
     return pd.DataFrame(star)
 
-def write_obslist(df, sysvel, outfile='obslist', vorb=None):
+def write_obslist(df, sysvel, outfile='obslist', vorb=None, overwrite=False):
     """
     Write list of observations in the format that grand likes.
 
@@ -39,7 +39,6 @@ def write_obslist(df, sysvel, outfile='obslist', vorb=None):
     DataFrame : Pandas DataFrame that looks like the output obslist
     """
     
-    f = open(outfile, 'w')
 
     df['fill'] = 0
     if 'vorb' not in df.columns or isinstance(vorb, type(None)):
@@ -54,9 +53,10 @@ def write_obslist(df, sysvel, outfile='obslist', vorb=None):
     body = odf.to_string(index=False, header=False,
                          columns=['ind', 'obs','fill', 'bc', 'vorb'],
                          formatters=['{:03d}'.format, '{:s}'.format, '{:d}'.format, '{:.5f}'.format, '{:.5f}'.format])
-    
-    print >>f, header+body
-    f.close()
+    if overwrite or not os.path.isfile(outfile):
+        f = open(outfile, 'w')
+        print >>f, header+body
+        f.close()
 
     return odf
 
@@ -82,7 +82,7 @@ def read_vel(infile):
     
     return zdf
 
-def combine_orders(runname, obdf, orders):
+def combine_orders(runname, obdf, orders, varr_byorder=False):
     """
     Combine velocities from multiple orders by mean and merge with observation information.
 
@@ -91,11 +91,14 @@ def combine_orders(runname, obdf, orders):
     runname : str : name of current grand run
     obdf : DataFrame : observation data frame from grandsol.io.write_obslist
     orders : list : list of orders to combine
-
+    varr_byorder : bool : (optional) return full velocity-by-order array in addition to the normal output
 
     Returns
     ---------
     vdf : DataFrame : Same as obdf with mean velocity (mnvel) and velocity uncertainty (errvel) columns added
+    or
+    (vdf, mnvel) : tuple : mnvel is a len(orders) X len(observations) array that contains the velocities
+                           for each other before taking the mean
     """
     
     mnvel = np.zeros((len(orders),len(obdf)))
@@ -115,5 +118,6 @@ def combine_orders(runname, obdf, orders):
     vdf['errvel'] = mnvel.std(axis=0) / np.sqrt(len(orders))
 
     mdf = pd.merge(vdf, obdf, left_index=True, right_on='ind')
-    
-    return mdf
+
+    if varr_byorder: return (mdf, relvel.vel)
+    else: return mdf
