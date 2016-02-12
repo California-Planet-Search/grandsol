@@ -1,8 +1,10 @@
-Python Library and Wrapper for the Grand Solution RV extraction code
+### Python Library and Wrapper for the Grand Solution RV extraction code
 
-Dependencies:
+##### Dependencies:
+```
 numpy
 scipy
 matplotlib
 pandas
 parallel python
+```
