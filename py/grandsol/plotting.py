@@ -3,13 +3,15 @@ import numpy as np
 import os
 import grandsol
 
+default_size = (10,6)
+
 def velplot_mean(vdf, fmt='ks'):
-    pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, markersize=10)
+    pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, markersize=12, markerfacecolor='none', markeredgewidth=2)
     pl.ylabel('RV [m$^{-1}$]')
     pl.xlabel('HJD$_{\\rm UTC}$ - 2440000')
 
 def velplot_by_order(runname, obdf, orders, outfile=None):
-    fig = pl.figure(figsize=(12,8))
+    fig = pl.figure(figsize=default_size)
     vdf, relvel = grandsol.io.combine_orders(runname, obdf, orders, varr_byorder=True)
 
     sigmas = []
@@ -27,7 +29,7 @@ def velplot_by_order(runname, obdf, orders, outfile=None):
     else: pl.savefig(outfile)
 
 def velplot_by_iter(runname, obdf, orders, iters=[1,2,3], outfile=None):
-    fig = pl.figure(figsize=(12,8))
+    fig = pl.figure(figsize=default_size)
     workdir = os.getcwd()
     sigmas = []
     for i in iters:
