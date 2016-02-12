@@ -9,7 +9,7 @@ def velplot_mean(vdf, fmt='ks'):
     pl.xlabel('HJD$_{\\rm UTC}$ - 2440000')
 
 def velplot_by_order(runname, obdf, orders, outfile=None):
-    fig = pl.figure()
+    fig = pl.figure(figsize=(12,8))
     vdf, relvel = grandsol.io.combine_orders(runname, obdf, orders, varr_byorder=True)
 
     sigmas = []
@@ -18,13 +18,16 @@ def velplot_by_order(runname, obdf, orders, outfile=None):
         sigmas.append(np.std(relvel[i,:]))
 
     velplot_mean(vdf)
-    pl.legend(orders+['Mean'], loc='best')
+
+    legendlabels = ["order %d $\sigma=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(orders,sigmas)] + ['Mean $\sigma=%.2f$' % np.std(vdf['mnvel'])]
+    
+    pl.legend(legendlabels, loc='best')
     pl.title(runname + " orders")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
 
 def velplot_by_iter(runname, obdf, orders, iters=[1,2,3], outfile=None):
-    fig = pl.figure()
+    fig = pl.figure(figsize=(12,8))
     workdir = os.getcwd()
     sigmas = []
     for i in iters:

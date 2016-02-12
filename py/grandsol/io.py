@@ -108,6 +108,8 @@ def combine_orders(runname, obdf, orders, varr_byorder=False):
         vdf = grandsol.io.read_vel('%s.%02d.99.vel' % (runname,o))
         mnvel[i,:] = vdf['veln']
         zarr[i,:] = vdf['zn']
+        #mnvel[i,:] = vdf['vbarn']
+        #zarr[i,:] = vdf['zbarn']
 
     rv = relativity.RV(z=zarr)
     bc = relativity.RV(z=vdf['z0'].values)
