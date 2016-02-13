@@ -110,6 +110,7 @@ def combine_orders(runname, obdf, orders, varr_byorder=False):
     mnvel = np.zeros((len(orders),len(obdf)))
     zarr = np.zeros((len(orders),len(obdf)))
 
+    goodorders = []
     for i,o in enumerate(orders):
         vdf = grandsol.io.read_vel('%s.%02d.99.vel' % (runname,o))
         mnvel[i,:] = vdf['veln']
@@ -117,13 +118,18 @@ def combine_orders(runname, obdf, orders, varr_byorder=False):
         #mnvel[i,:] = vdf['vbarn']
         #zarr[i,:] = vdf['zbarn']
 
+        if not (vdf['zn'] == vdf['z0']).all():
+            goodorders.append(i)
+        else:
+            print "io.combine_orders: WARNING: order %d velocities are all 0.0" % o
+                    
     rv = relativity.RV(z=zarr)
     bc = relativity.RV(z=vdf['z0'].values)
 
     relvel = rv - bc
 
-    vdf['mnvel'] = relvel.mean().vel.values()
-    vdf['errvel'] = mnvel.std(axis=0) / np.sqrt(len(orders))
+    vdf['mnvel'] = relvel.sum().vel / len(goodorders)
+    vdf['errvel'] = mnvel.std(axis=0) / np.sqrt(len(goodorders))
 
     mdf = pd.merge(vdf, obdf, left_index=True, right_on='ind')
 
