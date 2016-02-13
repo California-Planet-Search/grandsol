@@ -4,7 +4,7 @@ import os
 import grandsol.relativity as relativity
 import grandsol
 
-def get_observations(star):
+def get_observations(star, thin=200):
     """
     Find observations of a given star from $GRAND_KBCVEL and convert into a Pandas DataFrame.
 
@@ -20,7 +20,13 @@ def get_observations(star):
     """
     
     kbc = pd.read_csv(os.environ['GRAND_KBCVEL'], sep=' ', skiprows=1, skip_blank_lines=True, skipinitialspace=True, names=['obs', 'name', 'bc', 'jd', 'ha', 'type'])
-    star = kbc[(kbc['name'].str.upper() == star.upper()) & (kbc['type'] == 'o')]
+    star = kbc[(kbc['name'].str.upper() == star.upper()) & (kbc['type'] == 'o') & kbc.obs.str.startswith('rj')]
+
+    if len(star.obs.values) > thin:
+        np.random.seed(0)
+        perm = np.random.permutation(len(star.obs.values))[:thin]
+        star = star.iloc[perm].sort_values('jd').reset_index()
+        
     return pd.DataFrame(star)
 
 def write_obslist(df, sysvel, outfile='obslist', vorb=None, overwrite=False):

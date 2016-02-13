@@ -5,8 +5,8 @@ import grandsol
 
 default_size = (10,6)
 
-def velplot_mean(vdf, fmt='ks'):
-    pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, markersize=12, markerfacecolor='none', markeredgewidth=2)
+def velplot_mean(vdf, fmt='s'):
+    pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, markersize=10, markeredgewidth=1)
     pl.ylabel('RV [m$^{-1}$]')
     pl.xlabel('HJD$_{\\rm UTC}$ - 2440000')
 
