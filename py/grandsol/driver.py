@@ -50,7 +50,7 @@ def run_iterations(opt, ppserver=None):
         if i == 0:
             obdf = grandsol.io.write_obslist(df, opt.sysvel, outfile=obfile, vorb=0)
         else:
-            obdf = grandsol.io.write_obslist(df, opt.sysvel, outfile=obfile, vorb=vdf['mnvel'].values)  # Need to update vorb here
+            obdf = grandsol.io.write_obslist(df, opt.sysvel, outfile=obfile, vorb=vdf['mnvel'].values)
 
         run_orders(runname, obfile, ppserver, orders=opt.orders, overwrite=opt.overwrite)
         vdf = grandsol.io.combine_orders(runname, obdf, opt.orders)

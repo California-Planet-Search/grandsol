@@ -47,7 +47,7 @@ class RV():
 
     Methods
     -------
-    __add__ and __sub__ : handle the +  and - operators respectively and return new RV objects
+    __add__, __sub__, __mul__, __div__ : handle the +, -, *, and / operators respectively and return new RV objects
     with the relativistic sum or difference of the original RV.vel objects
 
     sum : sums an array of velocities over the specified axis using relativistic addition

@@ -3,13 +3,15 @@ import numpy as np
 import os
 import grandsol
 
-def velplot_mean(vdf, fmt='ks'):
-    pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, markersize=10)
+default_size = (10,6)
+
+def velplot_mean(vdf, fmt='s'):
+    pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, markersize=10, markeredgewidth=1)
     pl.ylabel('RV [m$^{-1}$]')
     pl.xlabel('HJD$_{\\rm UTC}$ - 2440000')
 
 def velplot_by_order(runname, obdf, orders, outfile=None):
-    fig = pl.figure(figsize=(12,8))
+    fig = pl.figure(figsize=default_size)
     vdf, relvel = grandsol.io.combine_orders(runname, obdf, orders, varr_byorder=True)
 
     sigmas = []
@@ -26,14 +28,23 @@ def velplot_by_order(runname, obdf, orders, outfile=None):
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
 
-def velplot_by_iter(runname, obdf, orders, iters=[1,2,3], outfile=None):
-    fig = pl.figure(figsize=(12,8))
+def velplot_by_iter(runname, obdf, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+    fig = pl.figure(figsize=default_size)
     workdir = os.getcwd()
+    prev = 0.0
     sigmas = []
     for i in iters:
-        os.chdir("iter%02d" % i)
-        
-        vdf = grandsol.io.combine_orders(runname, obdf, orders)
+        idir = "iter%02d" % i
+        if os.path.exists(idir): os.chdir(idir)
+        else: continue
+            
+        try:
+            vdf = grandsol.io.combine_orders(runname, obdf, orders)
+            diff = np.sum(((vdf['mnvel'] - prev) / vdf['errvel'])**2)
+            prev = vdf['mnvel']
+            print i, diff
+        except IOError:
+            continue
         velplot_mean(vdf, fmt='s')
         sigmas.append(np.std(vdf['mnvel']))
         

@@ -20,7 +20,7 @@ def args():
     parser.add_argument('--orders',dest='orders',action='store',help='List of spectral orders to analyze.',default=range(14)[1:-1])
     parser.add_argument('--local', dest='local',action='store_true',help='Run on local computer only. [True]',default=True)
     parser.add_argument('--ncpus',dest='ncpus',action='store',help='Number of local CPUs to utilize. [20]',default=20, type=int)
-    parser.add_argument('--niter',dest='niter',action='store',help='Number of outer loop iterations.',default=3, type=int)
+    parser.add_argument('--niter',dest='niter',action='store',help='Number of outer loop iterations.',default=10, type=int)
     
     opt = parser.parse_args()
     
