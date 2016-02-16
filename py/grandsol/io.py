@@ -119,14 +119,14 @@ def combine_orders(runname, obdf, orders, varr_byorder=False):
         #zarr[i,:] = vdf['zbarn']
 
         if not (vdf['zn'] == vdf['z0']).all():
-            goodorders.append(i)
+            goodorders.append(o)
         else:
             print "io.combine_orders: WARNING: order %d velocities are all 0.0" % o
                     
     rv = relativity.RV(z=zarr)
     bc = relativity.RV(z=vdf['z0'].values)
 
-    relvel = rv - bc
+    relvel = -(rv - bc)
 
     vdf['mnvel'] = relvel.sum().vel / len(goodorders)
     vdf['errvel'] = mnvel.std(axis=0) / np.sqrt(len(goodorders))
