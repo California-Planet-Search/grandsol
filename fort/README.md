@@ -182,7 +182,7 @@ Plot an observed spectrum and overplot the corresponding model fit:
 IDL> m=model[*,0] & plot, m.wob, m.obs, xsty=3 & oplot, m.wob, m.mdl*m.nrm, co=255
 ```
 
-Plot the fit residual an observed spectrum. Note any divergence at the ling wavelength end.
+Plot the fit residual for an observed spectrum. Note any divergence at the long wavelength end.
 ```
 IDL> m=model[*,0] & plot, m.wob, m.obs-m.mdl*m.nrm, xsty=3  
 ```
