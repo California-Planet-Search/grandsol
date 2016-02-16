@@ -123,6 +123,81 @@ uV^2 = (dV/dZ)^2 * uZ^2
 
 See fortran subroutine `save_vel()` for more information.
 
+### Model File (e.g. `star.08.99.mod`)
+
+#### Header
+None.
+
+#### Body
+| **Column** | **Description** | **Example** | **Variable** |
+| :---:  | :--- | :--- | :--- |
+| **0**  | Observation index (starting with 001) | `001` | `n` |
+| **1**  | Order index (starting with 01) | `08` | `m` |
+| **2**  | Pixel index (0001-4021 for HIRES) | `4021` | `i` |
+| **3**  | Observed spectrum [arbitrary units] | `47425.8` | `pix_imn(i,m,n)` |
+| **4**  | Unnormalized model spectrum | `73123.5` | `mod_imn(i,m,n)` |
+| **5**  | Wavelengths [A] in the observatory (iodine) frame | `5522.335491` | `wav_imn(i,m,n)` |
+| **6**  | Wavelengths [A] in the stellar frame | `5522.889612` | `wav_imn(i,m,n)/(1+zn(n))` |
+| **7**  | Normalization vector such that mod*nrm matches obs | `0.642063` | `nrm_imn(i,m,n)` |
+| **8**  | Smoothed mod*nrm that can be used to psuedo-normalize obs | `47803.4688` | `bar_imn(i,m,n)` |
+| **9**  | Flag indicating pixel was rejected as an outlier | `1` | `rej_imn(i,m,n)` |
+| **10** | Flag indicating pixel was rejected due to telluric lines | `0` | `tel_imn(i,m,n)` |
+| **11** | Flag indicating pixel was rejected due to meteor | `0` | `met_imn(i,m,n)` |
+
+Symbols:
+- zn = velocity divided by the speed of light
+
+This file has one row per observation, per order, per pixel.
+Use read_grand_mod.pro to read the contents of a .mod file into IDL.
+Observatory frame features include the iodine cell, telluric lines, and to some extent pixels.
+Stellar frame features consist mainly of the deconvolved stellar spectrum.
+Column 4 (MOD) times column 7 (NRM) is the normalized fit of the observation.
+
+#### Sample usage in IDL
+
+Read a .mod file into IDL:
+```
+IDL> read_grand_mod, 'sunsim09.08.99.mod', model
+```
+
+Examine the resulting IDL structure:
+```
+IDL> help, model
+MODEL           STRUCT    = -> <Anonymous> Array[4021, 100]
+IDL> help, /struct, model
+** Structure <35004e8>, 9 tags, length=40, data length=35, refs=1:
+   WOB             DOUBLE           5522.3355
+   WST             DOUBLE           5522.8896
+   OBS             FLOAT           47425.8
+   MDL             FLOAT           73123.5
+   NRM             FLOAT          0.642063
+   BAR             FLOAT           47803.5
+   REJ             BYTE         1
+   TEL             BYTE         0
+   MET             BYTE         0
+```
+
+Plot an observed spectrum and overplot the corresponding model fit:
+```
+IDL> m=model[*,0] & plot, m.wob, m.obs, xsty=3 & oplot, m.wob, m.mdl*m.nrm, co=255
+```
+
+Plot the fit residual an observed spectrum. Note any divergence at the ling wavelength end.
+```
+IDL> m=model[*,0] & plot, m.wob, m.obs-m.mdl*m.nrm, xsty=3  
+```
+
+Plot fit residuals in the observatory frame for all observations. Crop outliers at ends of the order.
+```
+IDL> m=model[*,0] & plot, m.wob, m.obs-m.mdl*m.nrm, ps=3, xsty=3, yr=300*[-1,1]        
+IDL> for i=1,99 do begin & m=model[*,i] & oplot, m.wob, m.obs-m.mdl*m.nrm, ps=3 & endfor
+```
+
+Plot fit residuals in the stellar frame for all observations. Crop outliers at ends of the order.
+```
+IDL> m=model[*,0] & plot, m.wst, m.obs-m.mdl*m.nrm, ps=3, xsty=3, yr=300*[-1,1]         
+IDL> for i=1,99 do begin & m=model[*,i] & oplot, m.wst, m.obs-m.mdl*m.nrm, ps=3 & endfor
+```
 
 ### Other files
 
