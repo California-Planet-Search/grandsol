@@ -40,6 +40,7 @@ def run_iterations(opt, ppserver=None):
     df = grandsol.io.get_observations(opt.star)
     runname = "iGrand_" + opt.star
     rundir = os.getcwd()
+    runorders = opt.orders
     
     for i in range(opt.niter):
         n = i+1
@@ -52,7 +53,13 @@ def run_iterations(opt, ppserver=None):
         else:
             obdf = grandsol.io.write_obslist(df, opt.sysvel, outfile=obfile, vorb=vdf['mnvel'].values)
 
-        run_orders(runname, obfile, ppserver, orders=opt.orders, overwrite=opt.overwrite)
-        vdf = grandsol.io.combine_orders(runname, obdf, opt.orders)
-        
+        run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite)
+        vdf, mnvel = grandsol.io.combine_orders(runname, obdf, runorders, varr_byorder=True)
+
+        # Don't continue running orders that produce 0.0s
+        goodorders = []
+        for i in range(mnvel.shape[0]):
+            if not (mnvel[i,:] == 0).all(): goodorders.append(runorders[i])
+        runorders = goodorders
+                
         os.chdir(rundir)
