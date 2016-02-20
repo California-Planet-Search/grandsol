@@ -13,7 +13,7 @@ def fit51peg(vdf):
     time_base = 2450000
     params = radvel.RVParameters(1,basis='per tc secosw sesinw logk')
     params['per1'] = 4.230785
-    params['tc1'] = 2450003.9156
+    params['tc1'] = 2450001.9156
     params['secosw1'] = 0.00 
     params['sesinw1'] = 0.00
     params['logk1'] = np.log(55.)

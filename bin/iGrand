@@ -16,13 +16,16 @@ def args():
     parser = argparse.ArgumentParser(description='Run iterative Grand Solution doppler analysis.')
     parser.add_argument(metavar='stars',dest='stars',action='store',help='Star or list of stars to analyze.',default=[], nargs='*')
     parser.add_argument(metavar='sysvel',dest='sysvel',action='store',help='Systemic radial velocity to star.',default=0, type=float)
+    parser.add_argument('--obslist',dest='obslist',action='store',help='Use existing obslist file instead of looking for observations in kbcvel.ascii',default=None, type=str)
     parser.add_argument('-o', '--overwrite', dest='overwrite',action='store_true',help='Overwrite previous run [False]',default=False)
     parser.add_argument('--orders',dest='orders',action='store',help='List of spectral orders to analyze.',default=range(12)[2:])
     parser.add_argument('--local', dest='local',action='store_true',help='Run on local computer only. [True]',default=True)
     parser.add_argument('--ncpus',dest='ncpus',action='store',help='Number of local CPUs to utilize. [20]',default=20, type=int)
     parser.add_argument('--niter',dest='niter',action='store',help='Number of outer loop iterations.',default=10, type=int)
     
+    
     opt = parser.parse_args()
+    if isinstance(opt.orders, str): opt.orders=eval(opt.orders)
     
     return opt
 

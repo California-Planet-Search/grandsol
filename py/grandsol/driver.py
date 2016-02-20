@@ -3,6 +3,7 @@ import os
 import shutil
 import grandsol
 import time
+import pandas as pd
 
 def execute(cmd, cwd, verbose=True):
     """
@@ -37,7 +38,16 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, orders=[1,2,3,4
     ppserver.wait()
         
 def run_iterations(opt, ppserver=None):
-    df = grandsol.io.get_observations(opt.star)
+    if opt.obslist != None:
+        f = open(opt.obslist, 'r')
+        for l in f.readlines():
+            if l.startswith('RJDIR'): datadir = l.split('=')[1].strip().replace('"','')
+        f.close()
+        df = pd.read_csv(opt.obslist, sep=' ', skipinitialspace=True, skiprows=2, names=['ind', 'obs', 'unused', 'bc', 'vorb'])
+        df['jd'] = df['ind'] + 15000.
+    else:
+        df = grandsol.io.get_observations(opt.star)
+        datadir = os.environ['GRAND_DATADIR']
     runname = "iGrand_" + opt.star
     rundir = os.getcwd()
     runorders = opt.orders
@@ -49,9 +59,11 @@ def run_iterations(opt, ppserver=None):
         os.chdir(idir)
         obfile = 'obslist_%02d' % n
         if i == 0:
-            obdf = grandsol.io.write_obslist(df, opt.sysvel, outfile=obfile, vorb=0)
+            vorb = 0.0
+            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
         else:
-            obdf = grandsol.io.write_obslist(df, opt.sysvel, outfile=obfile, vorb=vdf['mnvel'].values)
+            vorb = (grandsol.relativity.RV( vel=vdf['mnvel'] ) + grandsol.relativity.RV( vel=vorb )).values()
+            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
 
         run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite)
         vdf, mnvel = grandsol.io.combine_orders(runname, obdf, runorders, varr_byorder=True)

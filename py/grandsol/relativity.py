@@ -56,8 +56,9 @@ class RV():
     
     def __init__(self, **kwargs):#, vel=None, z=None):
         kwkeys = kwargs.keys()
-        if 'z' in kwkeys: self.vel = z2v(kwargs['z'])
         if 'vel' in kwkeys: self.vel = kwargs['vel']
+        if 'z' in kwkeys: self.vel = z2v(kwargs['z'])  
+        elif ('vel' not in kwkeys) and ('z' not in kwkwys): raise ValueError, "vel or z must be specified when constructing RV object"
 
     def __repr__(self):
         return "<RV Object>\n%s" % repr(self.vel).replace("<RV Object>\n","")
@@ -66,9 +67,10 @@ class RV():
         return RV( vel=-self.vel)
     
     def __add__(self, u):
-        v = self.vel
-        u = u.vel
-        return RV( vel = (u + v) / (1 + (u*v/(c**2))) )
+        v = self.vel / c
+        u = u.vel / c
+        new = (u+v) / (1 + u*v)
+        return RV( vel = (new * c) )
 
     def __sub__(self, u):
         return self.__add__(-u)
