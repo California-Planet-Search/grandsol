@@ -27,6 +27,8 @@ Sample environment variables and aliases for tcsh:
 
   setenv GRANDSOL_IDL_PATH ${MINIMAL_IDL_PATH}:+$GRAND/idl
 
+  setenv PYTHONPATH $GRAND/py:$PYTHONPATH  
+
   alias idlgr "env IDL_PATH=$GRANDSOL_IDL_PATH $IDL_DIR/bin/idl"
 
   alias grand ~/git/grandsol/fort/grand
