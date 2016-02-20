@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+from scipy.constants import c
 import grandsol.relativity as relativity
 import grandsol
 
@@ -29,7 +30,7 @@ def get_observations(star, thin=200):
         
     return pd.DataFrame(star)
 
-def write_obslist(df, sysvel, outfile='obslist', vorb=None, overwrite=False):
+def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, overwrite=False):
     """
     Write list of observations in the format that grand likes.
 
@@ -55,7 +56,7 @@ def write_obslist(df, sysvel, outfile='obslist', vorb=None, overwrite=False):
     odf = df.sort_values('jd').reset_index(drop=True)
     odf['ind'] = odf.index.values + 1
         
-    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\n' % (sysvel, os.environ['GRAND_DATADIR'])
+    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\n' % (sysvel, datadir)
     body = odf.to_string(index=False, header=False,
                          columns=['ind', 'obs','fill', 'bc', 'vorb'],
                          formatters=['{:03d}'.format, '{:s}'.format, '{:d}'.format, '{:.5f}'.format, '{:.5f}'.format])
@@ -111,6 +112,7 @@ def combine_orders(runname, obdf, orders, varr_byorder=False):
     zarr = np.zeros((len(orders),len(obdf)))
 
     goodorders = []
+    gi = []
     for i,o in enumerate(orders):
         vdf = grandsol.io.read_vel('%s.%02d.99.vel' % (runname,o))
         mnvel[i,:] = vdf['veln']
@@ -120,16 +122,17 @@ def combine_orders(runname, obdf, orders, varr_byorder=False):
 
         if not (vdf['zn'] == vdf['z0']).all():
             goodorders.append(o)
+            gi.append(i)
         else:
             print "io.combine_orders: WARNING: order %d velocities are all 0.0" % o
-                    
+            
     rv = relativity.RV(z=zarr)
     bc = relativity.RV(z=vdf['z0'].values)
 
-    relvel = -(rv - bc)
-
+    relvel = rv - bc
+        
     vdf['mnvel'] = relvel.sum().vel / len(goodorders)
-    vdf['errvel'] = mnvel.std(axis=0) / np.sqrt(len(goodorders))
+    vdf['errvel'] = mnvel[gi,:].std(axis=0) / np.sqrt(len(goodorders))
 
     mdf = pd.merge(vdf, obdf, left_index=True, right_on='ind')
 
