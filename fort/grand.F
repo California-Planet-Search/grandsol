@@ -555,39 +555,84 @@ c
 
       if (iargc().lt.3) then
  6001    format(a)
- 6002    format(2x,a,t16,': ',a)
- 6003    format(2x,2a,t16,': ',a)
- 6004    format(2x,a,i1,t16,': ',a)
- 6005    format(2x,a,i2.2,t16,': ',a)
- 6006    format(2x,a,i1,t16,': ',a,t39,'| ',a)
- 6007    format(2x,6i1,t16,': ',a)
-         write(6,6001) 'grand obslist label m' //
-     .     ' [out=] [mod1] [211111] [fudge-] [vorb+] [nitf=5] ...'
-         write(6,6002) 'obslist','file specifying observations'
-         write(6,6002) 'label','root to use for output filenames'
-         write(6,6002) 'm','echelle order to analyze'
-         write(6,6003) 'out=',trim(LOGFILE),'log file for diagnostics'
-         write(6,6006) 'vel',OUTPUT_VEL,'velocity output'
-         write(6,6006) 'tem',OUTPUT_TEM,'template output',
-     .                 '0=no output'
-         write(6,6006) 'mod',OUTPUT_MOD,'model output',
-     .                 '1=most recent interation'
-         write(6,6006) 'lsf',OUTPUT_LSF,'lsf output',
-     .                 '2=every iteration'
-         write(6,6006) 'nrm',OUTPUT_NRM,'normalization output'
-         write(6,6006) 'lin',OUTPUT_LIN,'line output'
-         write(6,6007) OUTPUT_VEL,OUTPUT_TEM,OUTPUT_MOD,
-     .                 OUTPUT_LSF,OUTPUT_NRM,OUTPUT_LIN,
-     .                 'vel-tem-mod-lsf-nrm-lin output flags'
-         write(6,6002) 'fudge+','apply B star correction, ' //
-     .                 'fudge- to suppress'
-         write(6,6002) 'vorb+','include orbital velocities in obslist, ' //
-         write(6,6004) 'nito=',NITo,'starting iteration number'
-         write(6,6005) 'nitf=',NITf,'final iteration number'
-         write(6,6001) 'grand obslist sunsim 8 out=sunsim.08.log' //
-     .     ' 211111 fudge-'
-         write(6,6001) 'grand obslist2 sunsim2 8 out=sunsim2.08.log' //
-     .     ' 211111 fudge- vorb+'
+ 6002    format(t14,a)
+ 6003    format(2x,a,t25,a)
+ 6004    format(2x,a,t25,a,i1,a)
+ 6005    format(2x,a,t25,a,i2,a)
+ 6006    format(2x,a,t25,a,L1,a)
+ 6007    format(t6,a)
+         write(6,6001) 'usage: grand obslist label m'
+         write(6,6002) '[nito=] [nitf=] [out=] [fudge{-,+}] [vorb+]'
+         write(6,6002) '[{0,1,2}{0,1,2}{0,1,2}{0,1,2}{0,1,2}{0,1,2}]'
+         write(6,6002) '[vel{0,1,2}] [tem{0,1,2}] [mod{0,1,2}]'
+         write(6,6002) '[lsf{0,1,2}] [nrm{0,1,2}] [lin{0,1,2}]'
+         write(6,6001) ''
+         write(6,6001) 'Simultaneously fit a set of observed' //
+     .     ' spectra obtained with an iodine cell.'
+         write(6,6001) 'Return radial velocities, deconvolved' //
+     .     ' stellar template, wavelengths,'
+         write(6,6001) 'model fit, line spread functions, and' //
+     .     ' normalization vectors.'
+         write(6,6001) ''
+         write(6,6001) 'positional arguments:'
+         write(6,6003) 'obslist',
+     .     'file containing list of observed spectra'
+         write(6,6003) 'label',
+     .     'root to use when generating output files'
+         write(6,6003) 'm', 'order number (starting with 1, not 0)'
+         write(6,6001) ''
+         write(6,6001) 'optional arguments:'
+         write(6,6003) '{0,1,2} x 6',
+     .     'output flags for {vel}{tem}{mod}{lsf}{nrm}{lin}'
+         write(6,6004) 'nito=',
+     .     'starting iteration number            (default: ',
+     .     _NITo_, ')'
+         write(6,6005) 'nitf=',
+     .     'final iteration number               (default: ',
+     .     _NITf_, ')'
+         write(6,6003) 'out=',
+     .     'file to contain diagnostics          (default: stdout)'
+         write(6,6006) 'vorb{-,+}',
+     .     'read vorb from column 5 of obslist   (default: ',
+     .     _DOVORB_, ')'
+         write(6,6006) 'fudge{-,+}',
+     .     'apply fudge correction to model      (default: ',
+     .     _DOFUDGE_, ')'
+         write(6,6004) 'vel{0,1,2}',
+     .     'output flag for velocities           (default: ',
+     .     _OUTPUT_VEL_, ')'
+         write(6,6004) 'tem{0,1,2}',
+     .     'output flag for template spectrum    (default: ',
+     .     _OUTPUT_TEM_, ')'
+         write(6,6004) 'mod{0,1,2}',
+     .     'output flag for model fit            (default: ',
+     .     _OUTPUT_MOD_, ')'
+         write(6,6004) 'lsf{0,1,2}',
+     .     'output flag for line spread function (default: ',
+     .     _OUTPUT_LSF_, ')'
+         write(6,6004) 'nrm{0,1,2}',
+     .     'output flag for normalization vector (default: ',
+     .     _OUTPUT_NRM_, ')'
+         write(6,6004) 'lin{0,1,2}',
+     .     'output flag for line regions         (default: ',
+     .     _OUTPUT_LIN_, ')'
+         write(6,6001) ''
+         write(6,6001) 'notes:'
+         write(6,6001) '  Output flags values:'
+         write(6,6007) '0: do not write output files'
+         write(6,6007) '1: write output files for current iteration'
+         write(6,6007) '2: write output files for every iteration'
+         write(6,6001) '  Maximum length of label is 59 characters'
+         write(6,6001) '  Interpretation of relative order number' //
+     .     ' m for HIRES:'
+         write(6,6007) ' 1: order 71 = 4977-5065 Angstroms'
+         write(6,6007) '16: order 56 = 6310-6368 Angstroms'
+         write(6,6001) '  Output flags can be specified two' //
+     .     ' different ways:'
+         write(6,6007) 'collectively as a six-digit integer' //
+     .     ' (default: 210100)'
+         write(6,6007) 'individually as a three-letter tag and' //
+     .     ' a one-digit integer (e.g., mod1)'
          stop
          endif
 
@@ -648,6 +693,11 @@ c
              read(STRING(4:4),*) OUTPUT_TEM
              goto 77
              endif
+         if (STRING(1:3).eq.'mod'.or.
+     .       STRING(1:3).eq.'MOD') then
+             read(STRING(4:4),*) OUTPUT_MOD
+             goto 77
+             endif
          if (STRING(1:3).eq.'lsf'.or.
      .       STRING(1:3).eq.'LSF') then
              read(STRING(4:4),*) OUTPUT_LSF
@@ -655,7 +705,7 @@ c
              endif
          if (STRING(1:3).eq.'nrm'.or.
      .       STRING(1:3).eq.'NRM') then
-             read(STRING(4:4),*) OUTPUT_LSF
+             read(STRING(4:4),*) OUTPUT_NRM
              goto 77
              endif
          if (STRING(1:3).eq.'lin'.or.
@@ -683,6 +733,11 @@ c
              read(STRING(4:4),*) OUTPUT_LSF
              read(STRING(5:5),*) OUTPUT_NRM
              read(STRING(6:6),*) OUTPUT_LIN
+             goto 77
+             endif
+         if (STRING(1:5).eq.'VORB-'.or.
+     .       STRING(1:5).eq.'vorb-') then
+             DOVORB = .false.
              goto 77
              endif
          if (STRING(1:5).eq.'VORB+'.or.
