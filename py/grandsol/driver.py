@@ -25,7 +25,7 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, orders=[1,2,3,4
     jobs = []
     for o in orders:
         cwd = os.getcwd()
-        cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ fudge+ nitf=10" % (obslist, runname, o, runname, o)
+        cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ fudge- nitf=10" % (obslist, runname, o, runname, o)
         if overwrite or not os.path.isfile('order_%02d.done' % o): 
             if ppserver == None:
                 execute(cmd, cwd)
