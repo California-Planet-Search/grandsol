@@ -18,6 +18,7 @@ def args():
     parser.add_argument(metavar='sysvel',dest='sysvel',action='store',help='Systemic radial velocity to star.',default=0, type=float)
     parser.add_argument('--obslist',dest='obslist',action='store',help='Use existing obslist file instead of looking for observations in kbcvel.ascii',default=None, type=str)
     parser.add_argument('-o', '--overwrite', dest='overwrite',action='store_true',help='Overwrite previous run [False]',default=False)
+    parser.add_argument('--nofudge', dest='nofudge',action='store_true',help='Do not apply the fudge [False]',default=False)
     parser.add_argument('--orders',dest='orders',action='store',help='List of spectral orders to analyze.',default=range(12)[2:])
     parser.add_argument('--local', dest='local',action='store_true',help='Run on local computer only. [True]',default=True)
     parser.add_argument('--ncpus',dest='ncpus',action='store',help='Number of local CPUs to utilize. [20]',default=20, type=int)
@@ -26,6 +27,7 @@ def args():
     
     opt = parser.parse_args()
     if isinstance(opt.orders, str): opt.orders=eval(opt.orders)
+    opt.fudge = ~opt.nofudge
     
     return opt
 
