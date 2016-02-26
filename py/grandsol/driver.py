@@ -5,13 +5,12 @@ import grandsol
 import time
 import pandas as pd
 
-def execute(cmd, cwd, verbose=True):
+def execute(cmd, cwd):
     """
     A thin wrapper for subprocess.Popen
     """
     os.chdir(cwd)
     o = int(cmd.split()[3])
-    if verbose: print "Running command: '%s'" % cmd
     lock = subprocess.Popen(["echo 'Start Time: '`date` > order_%02d.run" % o], shell=True)
 
     p = subprocess.Popen(cmd.split())
@@ -21,15 +20,18 @@ def execute(cmd, cwd, verbose=True):
     time.sleep(2)
     lock = subprocess.Popen(["mv order_%02d.run order_%02d.done" % (o,o)], shell=True)
     
-def run_orders(runname, obslist, ppserver=None, overwrite=False, orders=[1,2,3,4,5,6,7,8,9,10,11,12]):
+def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, orders=[1,2,3,4,5,6,7,8,9,10,11,12]):
     jobs = []
     for o in orders:
         cwd = os.getcwd()
-        cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ fudge- nitf=10" % (obslist, runname, o, runname, o)
+        cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ nitf=10" % (obslist, runname, o, runname, o)
+        if fudge: cmd += " fudge+"
+        else: cmd += " fudge-"
         if overwrite or not os.path.isfile('order_%02d.done' % o): 
             if ppserver == None:
                 execute(cmd, cwd)
             else:
+                print "Running command: '%s'" % cmd
                 jobs.append(ppserver.submit(execute, (cmd,cwd), modules=('subprocess','os', 'time')))
 
     for j in jobs:
@@ -65,7 +67,7 @@ def run_iterations(opt, ppserver=None):
             vorb = (grandsol.relativity.RV( vel=vdf['mnvel'] ) + grandsol.relativity.RV( vel=vorb )).values()
             obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
 
-        run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite)
+        run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite, fudge=opt.fudge)
         vdf, mnvel = grandsol.io.combine_orders(runname, obdf, runorders, varr_byorder=True)
 
         # Don't continue running orders that produce 0.0s
