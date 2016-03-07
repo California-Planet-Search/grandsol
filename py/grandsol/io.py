@@ -115,15 +115,16 @@ def combine_orders(runname, obdf, orders, varr_byorder=False):
     gi = []
     for i,o in enumerate(orders):
         vdf = grandsol.io.read_vel('%s.%02d.99.vel' % (runname,o))
-        mnvel[i,:] = vdf['veln']
-        zarr[i,:] = vdf['zn']
-        #mnvel[i,:] = vdf['vbarn']
-        #zarr[i,:] = vdf['zbarn']
+        #mnvel[i,:] = vdf['veln']
+        #zarr[i,:] = vdf['zn']
+        mnvel[i,:] = vdf['vbarn']
+        zarr[i,:] = vdf['zbarn']
 
         if not (vdf['zn'] == vdf['z0']).all():
             goodorders.append(o)
             gi.append(i)
         else:
+            mnvel[i,:] = 0.0
             print "io.combine_orders: WARNING: order %d velocities are all 0.0" % o
             
     rv = relativity.RV(z=zarr)
