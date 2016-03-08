@@ -15,8 +15,9 @@ def execute(cmd, cwd):
 
     p = subprocess.Popen(cmd.split())
     stdout, stderr = p.communicate()
+    errcode = p.returncode
     
-    lock = subprocess.Popen(["echo 'End Time: '`date` >> order_%02d.run" % o], shell=True)
+    lock = subprocess.Popen(["echo 'End Time: '`date`', return code: %s' >> order_%02d.run" % (errcode,o)], shell=True)
     time.sleep(2)
     lock = subprocess.Popen(["mv order_%02d.run order_%02d.done" % (o,o)], shell=True)
     
@@ -64,16 +65,10 @@ def run_iterations(opt, ppserver=None):
             vorb = 0.0
             obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
         else:
-            vorb = (grandsol.relativity.RV( vel=vdf['mnvel'] ) + grandsol.relativity.RV( vel=vorb )).values()
+            vorb = vdf['mnvel']
             obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
 
         run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite, fudge=opt.fudge)
         vdf, mnvel = grandsol.io.combine_orders(runname, obdf, runorders, varr_byorder=True)
-
-        # Don't continue running orders that produce 0.0s
-        goodorders = []
-        for i in range(mnvel.shape[0]):
-            if not (mnvel[i,:] == 0).all(): goodorders.append(runorders[i])
-        runorders = goodorders
                 
         os.chdir(rundir)

@@ -103,7 +103,7 @@ class RV():
         
         mnvel = s.__div__(N)
 
-        return RV( vel=mnvel )
+        return RV( vel=mnvel.values() )
     
     def values(self):
         return np.array(self.vel)
