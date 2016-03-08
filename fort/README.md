@@ -224,6 +224,23 @@ IDL> m=model[*,0] & plot, m.wst, m.obs-m.mdl*m.nrm, ps=3, xsty=3, yr=300*[-1,1]
 IDL> for i=1,99 do begin & m=model[*,i] & oplot, m.wst, m.obs-m.mdl*m.nrm, ps=3 & endfor
 ```
 
+### Stellar Template File (e.g. `star.08.99.tem`)
+
+#### Header
+None.
+
+#### Body
+| **Column** | **Description** | **Example** | **Variable** |
+| :---: | :--- | :--- | :--- |
+| **0** | Template node index (00001-30000) | `30000` | `s` |
+| **1** | Wavelength [Angstroms] | `5986.05036` | `ww_s(s)` |
+| **2** | Template spectrum at end of current internal `grand` iteration | `0.852927` | `tems(s)` |
+| **3** | Template spectrum at end of previous internal `grand` iteration | `0.862997` | `tem0(s)` |
+| **4** | Solar spectrum (Kurucz, Furenlid, Brault, & Testerman 1984) | `0.985750` | `sunw(ww_s(s))` |
+
+#### Notes
+At the start of each internal iteration after the first, `grand.F` reads and smoothes the template spectrum from the previous iteration. See the subroutine `smoo_tem( )` for the algorithm.
+
 ### Line spread functions (e.g., `*.lsf`)
 
 #### Header
