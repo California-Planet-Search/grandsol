@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import grandsol
 
-default_size = (12,8)
+default_size = (14,10)
 cmap = cm.jet
 
 def fit51peg(vdf):
@@ -76,13 +76,13 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
     sigmas = []
     for i,o in enumerate(orders):
         if vsbc:
-            pl.plot(vdf['bc'], relvel[i,:], 'o', color=colors[i])
+            pl.plot(obdf['bc'], relvel[i,:], 'o', color=colors[i])
         else:
             pl.plot(vdf['jd'], relvel[i,:], 'o', color=colors[i])
         sigmas.append(np.std(relvel[i,:]))
 
     if vsbc:
-        pl.errorbar(vdf['bc'], vdf['mnvel'], yerr=vdf['errvel'], fmt='s', color=colors[i], markersize=10, markeredgewidth=1)
+        pl.errorbar(obdf['bc'], vdf['mnvel'], yerr=vdf['errvel'], fmt='s', color=colors[i], markersize=10, markeredgewidth=1)
         pl.ylabel('RV [m$^{-1}$]')
         pl.xlabel('BC [m$^{-1}$]')
     else:

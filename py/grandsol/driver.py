@@ -4,6 +4,7 @@ import shutil
 import grandsol
 import time
 import pandas as pd
+import numpy as np
 
 def execute(cmd, cwd):
     """
@@ -17,12 +18,15 @@ def execute(cmd, cwd):
     stdout, stderr = p.communicate()
     errcode = p.returncode
     
-    lock = subprocess.Popen(["echo 'End Time: '`date`', return code: %s' >> order_%02d.run" % (errcode,o)], shell=True)
+    lock = subprocess.Popen(["echo 'End Time: '`date`'\nreturn code: %s' >> order_%02d.run" % (errcode,o)], shell=True)
     time.sleep(2)
     lock = subprocess.Popen(["mv order_%02d.run order_%02d.done" % (o,o)], shell=True)
+
+    return errcode
     
 def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, orders=[1,2,3,4,5,6,7,8,9,10,11,12]):
     jobs = []
+    good_orders = []
     for o in orders:
         cwd = os.getcwd()
         cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ nitf=10" % (obslist, runname, o, runname, o)
@@ -34,12 +38,23 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, ord
             else:
                 print "Running command: '%s'" % cmd
                 jobs.append(ppserver.submit(execute, (cmd,cwd), modules=('subprocess','os', 'time')))
-
-    for j in jobs:
-        j()
+        else:
+            f = open('order_%02d.done' % o, 'r')
+            for l in f.readlines():
+                if l.startswith("return"):
+                    errcode = int(l.split(":")[-1])
+                    break
+            f.close()
+            if errcode == 0: good_orders.append(o)
+                
+    for o,job in zip(orders,jobs):
+        e = job()
+        if e == 0: good_orders.append(o)
         
     ppserver.wait()
-        
+
+    return good_orders
+            
 def run_iterations(opt, ppserver=None):
     if opt.obslist != None:
         f = open(opt.obslist, 'r')
@@ -54,7 +69,8 @@ def run_iterations(opt, ppserver=None):
     runname = "iGrand_" + opt.star
     rundir = os.getcwd()
     runorders = opt.orders
-    
+
+    iterdone = []
     for i in range(opt.niter):
         n = i+1
         idir = "iter%02d" % n
@@ -62,13 +78,20 @@ def run_iterations(opt, ppserver=None):
         os.chdir(idir)
         obfile = 'obslist_%02d' % n
         if i == 0:
-            vorb = 0.0
+            vorb = pd.Series(np.zeros_like(df['jd']))
             obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
         else:
             vorb = vdf['mnvel']
             obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
 
-        run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite, fudge=opt.fudge)
+        runorders = run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite, fudge=opt.fudge)
         vdf, mnvel = grandsol.io.combine_orders(runname, obdf, runorders, varr_byorder=True)
-                
+
+        grandsol.plotting.velplot_by_order(runname, obdf, runorders, outfile='iGrand_%s_velbyord.pdf' % opt.star)
+        grandsol.plotting.velplot_by_order(runname, obdf, runorders, outfile='iGrand_%s_bcbyord.pdf' % opt.star, vsbc=True)
+
+        iterdone.append(n)
+        
         os.chdir(rundir)
+
+        grandsol.plotting.velplot_by_iter(runname, runorders, outfile='iGrand_%s_velbyiter.pdf' % opt.star, iters=iterdone)
