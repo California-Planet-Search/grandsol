@@ -10,8 +10,8 @@ pro read_grand_tem, file, tem, print=print
 ;Output:
 ; tem (structure[ntem]) template stellar spectrum from a .tem file
 ;  .w - wavelengths for template spectrum [Angstroms]
-;  .t - template spectrum
-;  .tz - template spectrum shifted to solar frame
+;  .t - template spectrum at end of current grand internal iteration
+;  .tprev - template spectrum at end of previous grand internal iteration
 ;  .sun - solar spectrum
 
 ;Syntax
@@ -49,17 +49,17 @@ pro read_grand_tem, file, tem, print=print
 
 ;Construct output structure.
   rec = $
-    { w   : 0d0 $
-    , t   : 0.0 $
-    , tz  : 0.0 $
-    , sun : 0.0 $
+    { w    : 0d0 $
+    , t    : 0.0 $
+    , tprev: 0.0 $
+    , sun  : 0.0 $
     }
   tem = replicate(rec, ntem)
 
 ;Populate output structure.
-  tem.w   = reform(data[1,*])
-  tem.t   = reform(data[2,*])
-  tem.tz  = reform(data[3,*])
-  tem.sun = reform(data[4,*])
+  tem.w     = reform(data[1,*])
+  tem.t     = reform(data[2,*])
+  tem.tprev = reform(data[3,*])
+  tem.sun   = reform(data[4,*])
 
 end
