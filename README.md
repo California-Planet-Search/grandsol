@@ -15,6 +15,8 @@ Brief descriptions of 'grandsol' subdirectories:
 See README files in each subdirectory for more information.
 
 Sample environment variables and aliases for tcsh:
+
+```
   setenv GRAND /Users/valenti/git/grandsol
 
   setenv GRAND_REFDIR $GRAND/fref
@@ -32,4 +34,4 @@ Sample environment variables and aliases for tcsh:
   alias idlgr "env IDL_PATH=$GRANDSOL_IDL_PATH $IDL_DIR/bin/idl"
 
   alias grand ~/git/grandsol/fort/grand
-
+```
