@@ -28,9 +28,6 @@ def fit51peg(vdf):
     like.params['gamma'] = 0.0
     like.params['logjit'] = np.log(1)
 
-    #like.vary['logjit'] = False
-    #like.vary['secosw1'] = False
-    #like.vary['sesinw1'] = False
     like.vary['dvdt'] = False
     like.vary['curv'] = False
 
@@ -196,15 +193,50 @@ def plot_mean_residuals(modfile):
     pixmean = model.groupby('pixel', as_index=False).mean()
     pixmean['residuals'] = pixmean['residuals'] = (pixmean['spec'] - (pixmean['model']*pixmean['cont'])) / pixmean['smooth_cont']
     pixmean['residuals_x10'] = pixmean['residuals'] * 10
+    pixmean['residuals_percent'] = pixmean['residuals'] * 100
     pixmean['normspec'] = pixmean['spec'] / pixmean['smooth_cont']
     pixmean['normmod'] = pixmean.residuals + pixmean.normspec
     
-    pixmean.plot('wav_star', 'normspec', color='k', lw=0.5)
-    ax = pl.gca()
+    #pixmean.plot('wav_star', 'normspec', color='k', lw=0.5)
+    #ax = pl.gca()
     #pixmean.plot('wav_star', 'normmod', color='b', linestyle='--', ax=ax)
-    pixmean.plot('wav_star', 'residuals_x10', color='r', ax=ax)
+    pixmean.plot('wav_star', 'residuals_percent', color='r', lw=1)
+    #ax = pl.gca()
+    #pixmean.plot('wav_obs', 'residuals_percent', color='b', lw=1, ax=ax)
 
-    pl.annotate('$\sigma$ residuals = %.3g' % pixmean.residuals.std(), xy=(0.7, 0.05), xycoords='axes fraction')
-    pl.ylabel('Relative Flux')
-    pl.ylim(-0.2, 1.4)
+    pl.annotate('$\sigma$ residuals = %.3g %%' % pixmean.residuals_percent.std(), xy=(0.7, 0.05), xycoords='axes fraction')
+    pl.ylabel('Relative Flux [%]')
+    #pl.ylim(-0.003, 0.003)
+    pl.ylim(-0.3, 0.3)
     pl.title(modfile)
+
+def plot_residuals_byobs(modfile):
+
+    outdf = pd.DataFrame()
+        
+    model = pd.read_csv(modfile, sep=' ', skipinitialspace=True, names=['ind', 'order', 'pixel', 'spec', 'model', 'wav_obs', 'wav_star', 'cont',
+                                                                        'smooth_cont', 'badflag', 'tellflag', 'metflag'])
+
+    byobs = model.groupby('ind', as_index=False)
+
+    for group in byobs.getgroups():
+        pass
+    pixmean['residuals'] = (pixmean['spec'] - (pixmean['model']*pixmean['cont'])) / pixmean['smooth_cont']
+    pixmean['residuals_x10'] = pixmean['residuals'] * 10
+    pixmean['residuals_percent'] = pixmean['residuals'] * 100
+    pixmean['normspec'] = pixmean['spec'] / pixmean['smooth_cont']
+    pixmean['normmod'] = pixmean.residuals + pixmean.normspec
+    
+    #pixmean.plot('wav_star', 'normspec', color='k', lw=0.5)
+    #ax = pl.gca()
+    #pixmean.plot('wav_star', 'normmod', color='b', linestyle='--', ax=ax)
+    pixmean.plot('wav_star', 'residuals_percent', color='r', lw=1)
+    #ax = pl.gca()
+    #pixmean.plot('wav_obs', 'residuals_percent', color='b', lw=1, ax=ax)
+
+    pl.annotate('$\sigma$ residuals = %.3g %%' % pixmean.residuals_percent.std(), xy=(0.7, 0.05), xycoords='axes fraction')
+    pl.ylabel('Relative Flux [%]')
+    #pl.ylim(-0.003, 0.003)
+    pl.ylim(-0.3, 0.3)
+    pl.title(modfile)
+

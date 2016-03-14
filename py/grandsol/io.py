@@ -36,9 +36,10 @@ def read_obslist(infile):
                       names=['ind', 'obs', 'unused', 'bc', 'vorb'])
     odf = pd.merge(df, kbc, on='obs')
 
-    if len(df) == 0:
+    if odf.empty:
         odf = df
-
+        odf['jd'] = odf.ind + 15500.   # Hack to fake JD timestamps in simulated data
+        
     return odf
 
 def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, overwrite=False):
@@ -142,7 +143,7 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False):
     rv = relativity.RV(z=zarr)
     bc = relativity.RV(z=vdf['z0'].values)
     prev = relativity.RV(vel=obdf['vorb'].values)
-    
+
     relvel = (rv - bc) + prev
         
     vdf['mnvel'] = relvel.mean().values()
