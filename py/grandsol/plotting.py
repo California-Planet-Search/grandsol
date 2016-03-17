@@ -187,9 +187,8 @@ def plot_mean_residuals(modfile):
 
     outdf = pd.DataFrame()
         
-    model = pd.read_csv(modfile, sep=' ', skipinitialspace=True, names=['ind', 'order', 'pixel', 'spec', 'model', 'wav_obs', 'wav_star', 'cont',
-                                                                        'smooth_cont', 'badflag', 'tellflag', 'metflag'])
-
+    model = grandsol.io.read_modfile(modfile)
+    
     pixmean = model.groupby('pixel', as_index=False).mean()
     pixmean['residuals'] = pixmean['residuals'] = (pixmean['spec'] - (pixmean['model']*pixmean['cont'])) / pixmean['smooth_cont']
     pixmean['residuals_x10'] = pixmean['residuals'] * 10
@@ -210,33 +209,58 @@ def plot_mean_residuals(modfile):
     pl.ylim(-0.3, 0.3)
     pl.title(modfile)
 
-def plot_residuals_byobs(modfile):
+def plot_residuals_byobs(modfile, outfile=None):
 
-    outdf = pd.DataFrame()
-        
-    model = pd.read_csv(modfile, sep=' ', skipinitialspace=True, names=['ind', 'order', 'pixel', 'spec', 'model', 'wav_obs', 'wav_star', 'cont',
-                                                                        'smooth_cont', 'badflag', 'tellflag', 'metflag'])
+    model = grandsol.io.read_modfile(modfile)
+
+    model['residuals'] = (model['spec'] - (model['model']*model['cont'])) / model['smooth_cont']
+    model['residuals_percent'] = model['residuals'] * 100
 
     byobs = model.groupby('ind', as_index=False)
 
-    for group in byobs.getgroups():
-        pass
-    pixmean['residuals'] = (pixmean['spec'] - (pixmean['model']*pixmean['cont'])) / pixmean['smooth_cont']
-    pixmean['residuals_x10'] = pixmean['residuals'] * 10
-    pixmean['residuals_percent'] = pixmean['residuals'] * 100
-    pixmean['normspec'] = pixmean['spec'] / pixmean['smooth_cont']
-    pixmean['normmod'] = pixmean.residuals + pixmean.normspec
-    
-    #pixmean.plot('wav_star', 'normspec', color='k', lw=0.5)
-    #ax = pl.gca()
-    #pixmean.plot('wav_star', 'normmod', color='b', linestyle='--', ax=ax)
-    pixmean.plot('wav_star', 'residuals_percent', color='r', lw=1)
-    #ax = pl.gca()
-    #pixmean.plot('wav_obs', 'residuals_percent', color='b', lw=1, ax=ax)
+    fig = pl.figure(figsize=(16,12))
+    pl.subplot(211)
+    pl.subplots_adjust(hspace=0.25)
 
-    pl.annotate('$\sigma$ residuals = %.3g %%' % pixmean.residuals_percent.std(), xy=(0.7, 0.05), xycoords='axes fraction')
-    pl.ylabel('Relative Flux [%]')
-    #pl.ylim(-0.003, 0.003)
-    pl.ylim(-0.3, 0.3)
-    pl.title(modfile)
+    for group in byobs.groups:
+        singleobs = pd.DataFrame(byobs.get_group(group))
+
+        pl.subplot(211)
+        pl.plot(singleobs['wav_obs'],singleobs['residuals_percent'], 'k.', markersize=0.4, rasterized=True)
+        ax_obs = pl.gca()
+    
+        pl.subplot(212)
+        pl.plot(singleobs['wav_star'],singleobs['residuals_percent'], 'k.', markersize=0.4, rasterized=True)
+        ax_star = pl.gca()
+
+    
+    rms = model.residuals_percent.std()
+    mad = grandsol.utils.MAD(model.residuals_percent.values)
+
+    waverange = model['wav_obs'].max() - model['wav_obs'].min()
+    crop_low = model['wav_obs'].min() + 0.05*waverange
+    crop_high = model['wav_obs'].max() - 0.05*waverange
+    rms_crop = model[(model['wav_obs'] > crop_low) & (model['wav_obs'] < crop_high)].residuals_percent.std()
+
+    ax_obs.axvline(crop_low, color='r', linestyle='dashed')
+    ax_obs.axvline(crop_high, color='r', linestyle='dashed')
+    ax_star.axvline(crop_low, color='r', linestyle='dashed')
+    ax_star.axvline(crop_high, color='r', linestyle='dashed')
+
+
+    ax_star.annotate("$\sigma$ = %.3f, $\sigma_{\\rm crop}$ = %.3f , MAD = %.3f %%" % (rms, rms_crop, mad) , xy=(0.2, 0.05), xycoords='axes fraction')
+    
+    ax_obs.set_ylim(-0.3, 0.3)
+    ax_obs.set_xlim(singleobs['wav_obs'].min(), singleobs['wav_obs'].max())
+    ax_obs.set_xlabel('Wavelength in observatory frame [$\AA$]')
+    ax_obs.set_ylabel('Relative flux residuals [%]')
+
+    ax_star.set_ylim(-0.3, 0.3)
+    ax_star.set_xlim(singleobs['wav_star'].min(), singleobs['wav_star'].max())
+    ax_star.set_xlabel('Wavelength in stellar frame [$\AA$]')
+    ax_star.set_ylabel('Relative flux residuals [%]')
+
+    if outfile == None: pl.show()
+    else: pl.savefig(outfile)
+
 
