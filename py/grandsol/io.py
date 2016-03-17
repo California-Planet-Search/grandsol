@@ -154,3 +154,10 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False):
 
     if varr_byorder: return (mdf, relvel.vel)
     else: return mdf
+
+
+def read_modfile(modfile):
+    model = pd.read_csv(modfile, sep=' ', skipinitialspace=True, names=['ind', 'order', 'pixel', 'spec', 'model', 'wav_obs', 'wav_star', 'cont',
+                                                                        'smooth_cont', 'badflag', 'tellflag', 'metflag'])
+
+    return model
