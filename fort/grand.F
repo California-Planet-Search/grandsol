@@ -226,7 +226,7 @@ c------------------------------------------------------------------------------
 c
 c number of images to be used ; control variable "n"
 c
-#define _NDIM_ 200
+#define _NDIM_ 399
  
  
 c------------------------------------------------------------------------------
@@ -349,22 +349,21 @@ c the average of its nearby neighbors (to allow
 c looking at fractional residuals), and whether it
 c is good or not.
 c
-      real   pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real   mod_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8 wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      real   tem_imn(_IDIM_,_MDIM_,_NDIM_)
-      real   rat_imn(_IDIM_,_MDIM_,_NDIM_)
-      real   bar_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1 rej_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1 tel_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1 uuu_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1 met_imn(_IDIM_,_MDIM_,_NDIM_)
- 
- 
+      real*4,    dimension(:,:,:), allocatable :: pix_imn
+      real*4,    dimension(:,:,:), allocatable :: mod_imn
+      real*8,    dimension(:,:,:), allocatable :: wav_imn
+      real*4,    dimension(:,:,:), allocatable :: tem_imn
+      real*4,    dimension(:,:,:), allocatable :: rat_imn
+      real*4,    dimension(:,:,:), allocatable :: bar_imn
+      integer*1, dimension(:,:,:), allocatable :: rej_imn
+      integer*1, dimension(:,:,:), allocatable :: tel_imn
+      integer*1, dimension(:,:,:), allocatable :: uuu_imn
+      integer*1, dimension(:,:,:), allocatable :: met_imn
+
 c
 c this is the parametrized LSF; q=1-->13 for nodes
 c
-      real   lsfqkmn(_QDIM_,_KDIM_,_MDIM_,_NDIM_)
+      real*4, dimension(:,:,:,:), allocatable ::   lsfqkmn
  
 c----------------------------------------------
 c
@@ -463,11 +462,12 @@ c
       real    velu, find_vel4sun  ! this is actually z...
       real*8  zn(_NDIM_)
       real*8  z0(_NDIM_)
- 
-      real*8  vln(_LDIM_,_NDIM_) ! line by line velocities
-      real*8  tln(_LDIM_,_NDIM_) ! line by line depth
-      integer iln(_LDIM_,_NDIM_) ! line by line pixel index
-      integer mln(_LDIM_,_NDIM_) ! line by line order number
+
+      real*8,  dimension(:,:), allocatable :: vln
+      real*8,  dimension(:,:), allocatable :: tln
+      integer, dimension(:,:), allocatable :: iln
+      integer, dimension(:,:), allocatable :: mln
+  
       real*8  zbarn(_NDIM_), zsign(_NDIM_) ! averages from above, by image
       real*8  zbarl(_LDIM_), zsigl(_LDIM_) ! averages from above, by line
  
@@ -646,6 +646,30 @@ c
          endif
 
       call getarg(1,RJSOURCE)
+
+      print*,'---> sense_raw...' 
+      call sense_raw(RJSOURCE,Ns)
+      print*,'---> Ns: ',Ns
+
+      print*,'ALLOCATE MAIN VARIABLES...'
+      allocate(pix_imn(_IDIM_,_MDIM_,Ns))
+      allocate(mod_imn(_IDIM_,_MDIM_,Ns))
+      allocate(wav_imn(_IDIM_,_MDIM_,Ns))
+      allocate(tem_imn(_IDIM_,_MDIM_,Ns))
+      allocate(rat_imn(_IDIM_,_MDIM_,Ns))
+      allocate(bar_imn(_IDIM_,_MDIM_,Ns))
+      allocate(rej_imn(_IDIM_,_MDIM_,Ns))
+      allocate(tel_imn(_IDIM_,_MDIM_,Ns))
+      allocate(uuu_imn(_IDIM_,_MDIM_,Ns))
+      allocate(met_imn(_IDIM_,_MDIM_,Ns))
+      allocate(lsfqkmn(_QDIM_,_KDIM_,_MDIM_,Ns))
+
+      allocate(vln(_LDIM_,Ns)) ! line by line velocities
+      allocate(tln(_LDIM_,Ns)) ! line by line depth
+      allocate(iln(_LDIM_,Ns)) ! line by line pixel index
+      allocate(mln(_LDIM_,Ns)) ! line by line order number
+
+
       call getarg(2,LABEL59)
       call getarg(3,STRING)
 
@@ -888,13 +912,13 @@ c
 c NIT=0... start from scratch...
 c
       write(6,*) ' '
+
  
       call read_raw(RJSOURCE,
      .              pix_imn,rat_imn,tem_imn,
      .              rej_imn,met_imn,
      .              wav_imn,unim,z0,Ns,MMIN,MMAX)
 
- 
       do n = 1, Ns
          zn(n) = z0(n)
          enddo
@@ -2384,12 +2408,12 @@ c
  
       real loctem(_SFIT_)                            ! OUTPUT: temlate to be filled
       integer   s1, s2                               ! INPUT:  range to fit
-      real      pix_imn(_IDIM_,_MDIM_,_NDIM_)        ! INPUT:  observations
-      real      rat_imn(_IDIM_,_MDIM_,_NDIM_)        ! INPUT:  ratio between obs/mod
-      integer*1 rej_imn(_IDIM_,_MDIM_,_NDIM_)        ! INPUT:  reject this pixel?
-      real*8    wav_imn(_IDIM_,_MDIM_,_NDIM_)        ! INPUT:  iodine wavelength
-      real*8    zn(_NDIM_)
-      real      lsfqkmn(_QDIM_,_KDIM_,_MDIM_,_NDIM_) ! INPUT:  LSF
+      real      pix_imn(_IDIM_,_MDIM_,Ns)            ! INPUT:  observations
+      real      rat_imn(_IDIM_,_MDIM_,Ns)            ! INPUT:  ratio between obs/mod
+      integer*1 rej_imn(_IDIM_,_MDIM_,Ns)            ! INPUT:  reject this pixel?
+      real*8    wav_imn(_IDIM_,_MDIM_,Ns)            ! INPUT:  iodine wavelength
+      real*8    zn(Ns)
+      real      lsfqkmn(_QDIM_,_KDIM_,_MDIM_,Ns)     ! INPUT:  LSF
       integer   Ns                                   ! INPUT:  number of images
       integer   MMIN, MMAX 
  
@@ -2651,12 +2675,12 @@ c
  
       real    tems(_SDIM_)
       integer sa, sb
-      real    pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    nrm_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  rej_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  zn(_NDIM_)
-      real    lsfqkmn(_QDIM_,_KDIM_,_MDIM_,_NDIM_)
+      real    pix_imn(_IDIM_,_MDIM_,NIMs)
+      real    nrm_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1  rej_imn(_IDIM_,_MDIM_,NIMs)
+      real*8  wav_imn(_IDIM_,_MDIM_,NIMs)
+      real*8  zn(NIMs)
+      real    lsfqkmn(_QDIM_,_KDIM_,_MDIM_,NIMs)
       integer NIMs
       integer MMIN, MMAX
  
@@ -5015,9 +5039,9 @@ c
       implicit none
  
       real    temu(_SDIM_)
-      real    nrm_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  zn(_NDIM_)
+      real    nrm_imn(_IDIM_,_MDIM_,NIMs)
+      real*8  wav_imn(_IDIM_,_MDIM_,NIMs)
+      real*8  zn(NIMs)
       integer NIMs
       integer MMIN, MMAX
  
@@ -5070,16 +5094,16 @@ c
      .                    zn,unim,NIT,NIMs,LABEL59,MMIN,MMAX)
       implicit none
  
-      real       pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real       mod_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8     wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  rej_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  tel_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  met_imn(_IDIM_,_MDIM_,_NDIM_)
-      real       nrm_imn(_IDIM_,_MDIM_,_NDIM_)
-      real       bar_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8     zn(_NDIM_)
-      logical    unim(_NDIM_)
+      real       pix_imn(_IDIM_,_MDIM_,NIMs)
+      real       mod_imn(_IDIM_,_MDIM_,NIMs)
+      real*8     wav_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1  rej_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1  tel_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1  met_imn(_IDIM_,_MDIM_,NIMs)
+      real       nrm_imn(_IDIM_,_MDIM_,NIMs)
+      real       bar_imn(_IDIM_,_MDIM_,NIMs)
+      real*8     zn(NIMs)
+      logical    unim(NIMs)
  
       real*8  ww
       integer NIT, NIMs, NITu
@@ -5133,13 +5157,14 @@ c
 c
       subroutine save_vel(zn,NIT,NIMs,z0,zbarn,zsign,unim,LABEL59)
       implicit none
-      real*8 zn(_NDIM_)
+
+      real*8 zn(NIMs)
       integer NIT
       integer NIMs
-      real*8  z0(_NDIM_)
-      real*8  zbarn(_NDIM_)
-      real*8  zsign(_NDIM_)
-      logical unim(_NDIM_)
+      real*8  z0(NIMs)
+      real*8  zbarn(NIMs)
+      real*8  zsign(NIMs)
+      logical unim(NIMs)
       character*59 LABEL59
  
       integer n
@@ -5248,10 +5273,10 @@ c
       subroutine save_lsf(lsfqkmn,NIT,NIMs,unim,LABEL59,MMIN,MMAX)
       implicit none
  
-      real lsfqkmn(_QDIM_,_KDIM_,_MDIM_,_NDIM_)
+      real lsfqkmn(_QDIM_,_KDIM_,_MDIM_,NIMs)
       integer NIT
       integer NIMs
-      logical unim(_NDIM_)
+      logical unim(NIMs)
       character*59 LABEL59
       integer MMIN, MMAX
  
@@ -5293,13 +5318,13 @@ c
      .                    unim,NIT,NIMs,LABEL59)
       implicit none
  
-      real    pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    mod_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  rej_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    nrm_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    bar_imn(_IDIM_,_MDIM_,_NDIM_)
-      logical unim(_NDIM_)
+      real    pix_imn(_IDIM_,_MDIM_,NIMs)
+      real    mod_imn(_IDIM_,_MDIM_,NIMs)
+      real*8  wav_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1  rej_imn(_IDIM_,_MDIM_,NIMs)
+      real    nrm_imn(_IDIM_,_MDIM_,NIMs)
+      real    bar_imn(_IDIM_,_MDIM_,NIMs)
+      logical unim(NIMs)
       integer NIT, NIMs
       character*59 LABEL59
 
@@ -5322,7 +5347,7 @@ c
       write(FILENAME,'(''.'',i2.2,''.mod'')') NITu
       FILENAME = TRIM(LABEL59) // FILENAME
        
-      do n = 1, _NDIM_
+      do n = 1, NIMs
          unim(n) = .false.
          enddo
  
@@ -5375,10 +5400,10 @@ c
 c
       subroutine read_vel(zn,NIT,NIMs,z0,LABEL59)
       implicit none
-      real*8 zn(_NDIM_)
+      real*8 zn(NIMs)
       integer NIT
       integer NIMs
-      real*8 z0(_NDIM_)
+      real*8 z0(NIMs)
       character*59 LABEL59
  
       integer n, nn
@@ -5450,7 +5475,7 @@ c
       subroutine read_lsf(lsfqkmn,NIT,NIMs,LABEL59)
       implicit none
  
-      real lsfqkmn(_QDIM_,_KDIM_,_MDIM_,_NDIM_)
+      real lsfqkmn(_QDIM_,_KDIM_,_MDIM_,NIMs)
       integer NIT, NIMs
       character*59 LABEL59
  
@@ -5487,6 +5512,35 @@ c
  
  
  
+c-------------------------------------------------------------
+c
+c this will read in the file for the raw data and will return
+c the number of images it will need to read in...
+c
+      subroutine sense_raw(RJSOURCE,NIMs)
+      implicit none
+    
+      character*80 RJSOURCE
+      integer      NIMs
+
+      character*200 STRING
+      integer NIM
+
+      open(20,file=RJSOURCE,status='old')
+      NIMs = 0
+    1 continue
+      read(20,'(200a)',end=4) STRING
+      if (STRING(1:1).ge.'0'.and.STRING(1:1).le.'9') then
+          read(STRING,*) NIM
+          if (NIM.gt.NIMs) NIMs = NIM
+          endif
+      goto 1
+    4 continue
+      close(20)
+
+      return
+      end
+
  
 c-------------------------------------------------------------
 c
@@ -5500,14 +5554,14 @@ c
       implicit none
  
       character*80 RJSOURCE
-      real      pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real      nrm_imn(_IDIM_,_MDIM_,_NDIM_)
-      real      tem_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1 uuu_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1 met_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8 wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      logical unim(_NDIM_)
-      real*8  z0(_NDIM_)
+      real      pix_imn(_IDIM_,_MDIM_,NIMs)
+      real      nrm_imn(_IDIM_,_MDIM_,NIMs)
+      real      tem_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1 uuu_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1 met_imn(_IDIM_,_MDIM_,NIMs)
+      real*8 wav_imn(_IDIM_,_MDIM_,NIMs)
+      logical unim(NIMs)
+      real*8  z0(NIMs)
       integer NIMs
       integer MMIN, MMAX
  
@@ -5529,7 +5583,7 @@ c
       logical DOVORB
       common /DOVORB_/DOVORB
  
-      do n = 1, _NDIM_
+      do n = 1, NIMs
          unim(n) = .false.
          do m = 1, _MDIM_
          do i = 1, _IDIM_
@@ -6793,13 +6847,13 @@ c
      .                       zbarl,zsigl,LABEL59)
       implicit none
  
-      real*8  vln(_LDIM_,_NDIM_)
-      real*8  tln(_LDIM_,_NDIM_)
-      integer iln(_LDIM_,_NDIM_)
-      integer mln(_LDIM_,_NDIM_)
-      logical unim(_NDIM_)
+      real*8  vln(_LDIM_,Ns)
+      real*8  tln(_LDIM_,Ns)
+      integer iln(_LDIM_,Ns)
+      integer mln(_LDIM_,Ns)
+      logical unim(Ns)
       integer Ns, Ls, NIT
-      real*8  zbarn(_NDIM_), zsign(_NDIM_)
+      real*8  zbarn(Ns), zsign(Ns)
       real*8  zbarl(_LDIM_), zsigl(_LDIM_)
       character*59 LABEL59
  
@@ -7606,8 +7660,8 @@ c
       subroutine tell_rej(wav_imn,rej_imn,Ns)
       implicit none
  
-      real*8 wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1 rej_imn(_IDIM_,_MDIM_,_NDIM_)
+      real*8 wav_imn(_IDIM_,_MDIM_,Ns)
+      integer*1 rej_imn(_IDIM_,_MDIM_,Ns)
       integer Ns
  
       integer i,m,n
@@ -7641,13 +7695,13 @@ c
      .                    NIT,NIMs,LABEL59,MMIN,MMAX)
       implicit none
  
-      real    pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    mod_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  rej_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    nrm_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    bar_imn(_IDIM_,_MDIM_,_NDIM_)
-      logical unim(_NDIM_)
+      real    pix_imn(_IDIM_,_MDIM_,NIMs)
+      real    mod_imn(_IDIM_,_MDIM_,NIMs)
+      real*8  wav_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1  rej_imn(_IDIM_,_MDIM_,NIMs)
+      real    nrm_imn(_IDIM_,_MDIM_,NIMs)
+      real    bar_imn(_IDIM_,_MDIM_,NIMs)
+      logical unim(NIMs)
       character*59 LABEL59
       integer MMIN, MMAX
  
@@ -7763,12 +7817,12 @@ c
      .                        Ns,MMIN,MMAX)
       implicit none
  
-      real    mod_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  z0(_NDIM_)
-      real    lsfqkmn(_QDIM_,_KDIM_,_MDIM_,_NDIM_)
+      real    mod_imn(_IDIM_,_MDIM_,Ns)
+      real*8  wav_imn(_IDIM_,_MDIM_,Ns)
+      real*8  z0(Ns)
+      real    lsfqkmn(_QDIM_,_KDIM_,_MDIM_,Ns)
       real    tems(_SDIM_)
-      logical unim(_NDIM_)
+      logical unim(Ns)
       integer Ns
       integer MMIN, MMAX
  
@@ -7802,16 +7856,16 @@ c
      .                       wav_imn,z0,unim,Ns,MMIN,MMAX)
       implicit none
  
-      real    pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    mod_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    rat_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    bar_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  rej_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  uuu_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  met_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8  z0(_NDIM_)
-      logical unim(_NDIM_)
+      real    pix_imn(_IDIM_,_MDIM_,Ns)
+      real    mod_imn(_IDIM_,_MDIM_,Ns)
+      real    rat_imn(_IDIM_,_MDIM_,Ns)
+      real    bar_imn(_IDIM_,_MDIM_,Ns)
+      integer*1  rej_imn(_IDIM_,_MDIM_,Ns)
+      integer*1  uuu_imn(_IDIM_,_MDIM_,Ns)
+      integer*1  met_imn(_IDIM_,_MDIM_,Ns)
+      real*8  wav_imn(_IDIM_,_MDIM_,Ns)
+      real*8  z0(Ns)
+      logical unim(Ns)
       integer Ns
       integer MMIN, MMAX
  
@@ -7824,7 +7878,7 @@ c
       integer mu(9999)
       integer nu(9999)
  
-      do n = 01, _NDIM_
+      do n = 01, Ns
       do m = 01, _MDIM_
       do i = 01, _IDIM_
          uuu_imn(i,m,n) = rej_imn(i,m,n)
@@ -7887,7 +7941,7 @@ c
          enddo!s
       close(91)
 
-      do n = 01, _NDIM_
+      do n = 01, Ns
       do m = 01, _MDIM_
       do i = 01, _IDIM_
          if (met_imn(i,m,n).ge.2) uuu_imn(i,m,n) = 1
@@ -7910,13 +7964,13 @@ c
      .                        NIT,MMIN,MMAX)
       implicit none
  
-      real    pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    mod_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    bar_imn(_IDIM_,_MDIM_,_NDIM_)
-      real    rat_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  rej_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  met_imn(_IDIM_,_MDIM_,_NDIM_)
-      logical unim(_NDIM_)
+      real    pix_imn(_IDIM_,_MDIM_,Ns)
+      real    mod_imn(_IDIM_,_MDIM_,Ns)
+      real    bar_imn(_IDIM_,_MDIM_,Ns)
+      real    rat_imn(_IDIM_,_MDIM_,Ns)
+      integer*1  rej_imn(_IDIM_,_MDIM_,Ns)
+      integer*1  met_imn(_IDIM_,_MDIM_,Ns)
+      logical unim(Ns)
       integer Ns, NIT
       integer MMIN, MMAX
  
@@ -13107,14 +13161,14 @@ c
       implicit none
  
       real    tems(_SDIM_)
-      real       pix_imn(_IDIM_,_MDIM_,_NDIM_)
-      real       mod_imn(_IDIM_,_MDIM_,_NDIM_)
-      real       rat_imn(_IDIM_,_MDIM_,_NDIM_)
-      real       bar_imn(_IDIM_,_MDIM_,_NDIM_)
-      integer*1  uuu_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8     wav_imn(_IDIM_,_MDIM_,_NDIM_)
-      real*8     zn(_NDIM_)
-      logical    unim(_NDIM_)
+      real       pix_imn(_IDIM_,_MDIM_,NIMs)
+      real       mod_imn(_IDIM_,_MDIM_,NIMs)
+      real       rat_imn(_IDIM_,_MDIM_,NIMs)
+      real       bar_imn(_IDIM_,_MDIM_,NIMs)
+      integer*1  uuu_imn(_IDIM_,_MDIM_,NIMs)
+      real*8     wav_imn(_IDIM_,_MDIM_,NIMs)
+      real*8     zn(NIMs)
+      logical    unim(NIMs)
       integer    NIMs
       integer    MMMM
  
