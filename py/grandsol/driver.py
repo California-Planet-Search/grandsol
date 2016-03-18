@@ -46,6 +46,10 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, ord
                     break
             f.close()
             if errcode == 0: good_orders.append(o)
+
+        modfile = "%s.%02d.99.mod" % (runname, o)
+        if os.path.isfile(modfile): grandsol.plotting.plot_residuals_byobs(modfile, outfile="%s_%02d_residuals.png" % (runname, o))
+
                 
     for o,job in zip(orders,jobs):
         e = job()
@@ -89,7 +93,7 @@ def run_iterations(opt, ppserver=None):
 
         grandsol.plotting.velplot_by_order(runname, obdf, runorders, outfile='iGrand_%s_velbyord.pdf' % opt.star)
         grandsol.plotting.velplot_by_order(runname, obdf, runorders, outfile='iGrand_%s_bcbyord.pdf' % opt.star, vsbc=True)
-
+            
         iterdone.append(n)
         
         os.chdir(rundir)

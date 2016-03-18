@@ -1,5 +1,6 @@
 import pylab as pl
 from matplotlib import cm
+import matplotlib
 import numpy as np
 import pandas as pd
 import os
@@ -76,7 +77,8 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
             pl.plot(obdf['bc'], relvel[i,:], 'o', color=colors[i])
         else:
             pl.plot(vdf['jd'], relvel[i,:], 'o', color=colors[i])
-        sigmas.append(np.std(relvel[i,:]))
+        #sigmas.append(np.std(relvel[i,:]))
+        sigmas.append(grandsol.utils.MAD(relvel[i,:]))
 
     if vsbc:
         pl.errorbar(obdf['bc'], vdf['mnvel'], yerr=vdf['errvel'], fmt='s', color=colors[i], markersize=10, markeredgewidth=1)
@@ -85,7 +87,7 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
     else:
         velplot_mean(vdf, color=colors[i])
 
-    legendlabels = ["order %d $\sigma=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(orders,sigmas)] + ['Mean $\sigma=%.2f$' % np.std(vdf['mnvel'])]
+    legendlabels = ["order %d $\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(orders,sigmas)] + ['Mean $\sigma=%.2f$' % grandsol.utils.MAD(vdf['mnvel'])]
     
     pl.legend(legendlabels, loc='best')
     pl.title(runname + " orders")
@@ -115,11 +117,12 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
             continue
 
         velplot_mean(vdf, fmt='s', color=colors[i-1])
-        sigmas.append(np.std(vdf['mnvel']))
+        #sigmas.append(np.std(vdf['mnvel']))
+        sigmas.append(grandsol.utils.MAD(vdf['mnvel']))
         
         os.chdir(workdir)
 
-    legendlabels = ["iteration %d\n$\sigma=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(iters,sigmas)]
+    legendlabels = ["iteration %d\n$\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(iters,sigmas)]
     
     pl.legend(legendlabels, loc='best')
     pl.title(runname + " iterations")
@@ -171,11 +174,11 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
         pl.ylabel('RV m s$^{-1}$')
 
         Klist.append(np.exp(post.params['logk1']))
-        sigmas.append(np.std(post.likelihood.residuals()))
+        sigmas.append(grandsol.utils.MAD(post.likelihood.residuals()))
         
         os.chdir(workdir)
 
-    legendlabels = ["iteration %d\n$K=%.1f$ RMS=%.1f m s$^{-1}$" % (i,k,s) for i,k,s in zip(iters,Klist,sigmas)]
+    legendlabels = ["iteration %d\n$K=%.1f$ MAD=%.1f m s$^{-1}$" % (i,k,s) for i,k,s in zip(iters,Klist,sigmas)]
     
     pl.legend(legendlabels, loc='best')
     pl.title(runname + " iterations")
@@ -203,14 +206,15 @@ def plot_mean_residuals(modfile):
     #ax = pl.gca()
     #pixmean.plot('wav_obs', 'residuals_percent', color='b', lw=1, ax=ax)
 
-    pl.annotate('$\sigma$ residuals = %.3g %%' % pixmean.residuals_percent.std(), xy=(0.7, 0.05), xycoords='axes fraction')
+    pl.annotate('$\sigma_m$ residuals = %.3g %%' % grandsol.utils.MAD(pixmean.residuals_percent.values), xy=(0.7, 0.05), xycoords='axes fraction')
     pl.ylabel('Relative Flux [%]')
     #pl.ylim(-0.003, 0.003)
     pl.ylim(-0.3, 0.3)
     pl.title(modfile)
 
 def plot_residuals_byobs(modfile, outfile=None):
-
+    print "Plotting residuals contained in %s" % modfile
+    
     model = grandsol.io.read_modfile(modfile)
 
     model['residuals'] = (model['spec'] - (model['model']*model['cont'])) / model['smooth_cont']
@@ -237,6 +241,8 @@ def plot_residuals_byobs(modfile, outfile=None):
     rms = model.residuals_percent.std()
     mad = grandsol.utils.MAD(model.residuals_percent.values)
 
+    print rms, mad
+    
     waverange = model['wav_obs'].max() - model['wav_obs'].min()
     crop_low = model['wav_obs'].min() + 0.05*waverange
     crop_high = model['wav_obs'].max() - 0.05*waverange
@@ -250,12 +256,12 @@ def plot_residuals_byobs(modfile, outfile=None):
 
     ax_star.annotate("$\sigma$ = %.3f, $\sigma_{\\rm crop}$ = %.3f , MAD = %.3f %%" % (rms, rms_crop, mad) , xy=(0.2, 0.05), xycoords='axes fraction')
     
-    ax_obs.set_ylim(-0.3, 0.3)
+    ax_obs.set_ylim(-5*mad, 5*mad)
     ax_obs.set_xlim(singleobs['wav_obs'].min(), singleobs['wav_obs'].max())
     ax_obs.set_xlabel('Wavelength in observatory frame [$\AA$]')
     ax_obs.set_ylabel('Relative flux residuals [%]')
 
-    ax_star.set_ylim(-0.3, 0.3)
+    ax_star.set_ylim(-5*mad, 5*mad)
     ax_star.set_xlim(singleobs['wav_star'].min(), singleobs['wav_star'].max())
     ax_star.set_xlabel('Wavelength in stellar frame [$\AA$]')
     ax_star.set_ylabel('Relative flux residuals [%]')
