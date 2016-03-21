@@ -7,7 +7,7 @@ import grandsol
 
 kbc = pd.read_csv(os.environ['GRAND_KBCVEL'], sep=' ', skiprows=1, skip_blank_lines=True, skipinitialspace=True, names=['obs', 'name', 'bc', 'jd', 'ha', 'type'])
 
-def get_observations(star, thin=200):
+def get_observations(star, thin=999):
     """
     Find observations of a given star from $GRAND_KBCVEL and convert into a Pandas DataFrame.
 
@@ -157,7 +157,8 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False):
 
 
 def read_modfile(modfile):
-    model = pd.read_csv(modfile, sep=' ', skipinitialspace=True, names=['ind', 'order', 'pixel', 'spec', 'model', 'wav_obs', 'wav_star', 'cont',
-                                                                        'smooth_cont', 'badflag', 'tellflag', 'metflag'])
+    model = pd.read_csv(modfile, sep=' ', skipinitialspace=True,
+                        names=['ind', 'order', 'pixel', 'spec', 'model', 'wav_obs', 'wav_star', 'cont',
+                                'smooth_cont', 'badflag', 'tellflag', 'metflag'])
 
     return model

@@ -14,7 +14,7 @@ def execute(cmd, cwd):
     o = int(cmd.split()[3])
     lock = subprocess.Popen(["echo 'Start Time: '`date` > order_%02d.run" % o], shell=True)
 
-    p = subprocess.Popen(cmd.split())
+    p = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     errcode = p.returncode
     
@@ -99,3 +99,5 @@ def run_iterations(opt, ppserver=None):
         os.chdir(rundir)
 
         grandsol.plotting.velplot_by_iter(runname, runorders, outfile='iGrand_%s_velbyiter.pdf' % opt.star, iters=iterdone)
+
+    plot_resMAD_byiter(runname, obdf, runorders, iters=iterdone, outfile="%s_resMAD_byiter.pdf" % runname)

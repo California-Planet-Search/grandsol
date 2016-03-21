@@ -270,3 +270,36 @@ def plot_residuals_byobs(modfile, outfile=None):
     else: pl.savefig(outfile)
 
 
+def plot_resMAD_byiter(runname, obdf, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+
+    colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(orders))]
+    MADarr = np.zeros((len(iters), len(orders)))
+        
+    for i,iteration in enumerate(iters):
+        os.chdir('iter%02d' % iteration)
+        for j,o in enumerate(orders):
+            modfile = "%s.%02d.99.mod" % (runname, o)
+            model = grandsol.io.read_modfile(modfile)
+            model['residuals'] = (model['spec'] - (model['model']*model['cont'])) / model['smooth_cont']
+            model['residuals_percent'] = model['residuals'] * 100
+
+            mad = grandsol.utils.MAD(model['residuals_percent'])
+            
+            MADarr[i, j] = mad
+            print iteration, o, mad
+        os.chdir('..')
+        
+    #MADarr /= np.mean(MADarr, axis=0)
+    #MADarr -= 1
+    
+    fig = pl.figure(figsize=default_size)
+
+    for i,c in enumerate(colors):
+        pl.plot(iters, MADarr[:,i], 'o-', markersize=10, color=c)
+
+    pl.legend(['order %d' % o for o in orders])
+    pl.xlabel('iteration')
+    pl.ylabel('MAD of residuals [%]')
+            
+    if outfile == None: pl.show()
+    else: pl.savefig(outfile)
