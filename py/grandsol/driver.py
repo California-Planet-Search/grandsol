@@ -12,11 +12,15 @@ def execute(cmd, cwd):
     """
     os.chdir(cwd)
     o = int(cmd.split()[3])
+    runname = cmd.split()[2]
     lock = subprocess.Popen(["echo 'Start Time: '`date` > order_%02d.run" % o], shell=True)
 
     p = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     errcode = p.returncode
+
+    modfile = "%s.%02d.99.mod" % (runname, o)
+    if os.path.isfile(modfile): grandsol.plotting.plot_residuals_byobs(modfile, outfile="%s_%02d_residuals.png" % (runname, o))
     
     lock = subprocess.Popen(["echo 'End Time: '`date`'\nreturn code: %s' >> order_%02d.run" % (errcode,o)], shell=True)
     time.sleep(2)
@@ -37,7 +41,7 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, ord
                 execute(cmd, cwd)
             else:
                 print "Running command: '%s'" % cmd
-                jobs.append(ppserver.submit(execute, (cmd,cwd), modules=('subprocess','os', 'time')))
+                jobs.append(ppserver.submit(execute, (cmd,cwd), modules=('subprocess','os', 'time', 'grandsol')))
         else:
             f = open('order_%02d.done' % o, 'r')
             for l in f.readlines():
@@ -45,17 +49,17 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, ord
                     errcode = int(l.split(":")[-1])
                     break
             f.close()
-            if errcode == 0: good_orders.append(o)
-
-        modfile = "%s.%02d.99.mod" % (runname, o)
-        if os.path.isfile(modfile): grandsol.plotting.plot_residuals_byobs(modfile, outfile="%s_%02d_residuals.png" % (runname, o))
+            if errcode == 0:
+                good_orders.append(o)
+                modfile = "%s.%02d.99.mod" % (runname, o)
+                if os.path.isfile(modfile): grandsol.plotting.plot_residuals_byobs(modfile, outfile="%s_%02d_residuals.png" % (runname, o))
 
                 
     for o,job in zip(orders,jobs):
         e = job()
         if e == 0: good_orders.append(o)
         
-    ppserver.wait()
+    ppserver.wait()            
 
     return good_orders
             
@@ -100,4 +104,4 @@ def run_iterations(opt, ppserver=None):
 
         grandsol.plotting.velplot_by_iter(runname, runorders, outfile='iGrand_%s_velbyiter.pdf' % opt.star, iters=iterdone)
 
-    plot_resMAD_byiter(runname, obdf, runorders, iters=iterdone, outfile="%s_resMAD_byiter.pdf" % runname)
+    grandsol.plotting.plot_resMAD_byiter(runname, obdf, runorders, iters=iterdone, outfile="%s_resMAD_byiter.pdf" % runname)

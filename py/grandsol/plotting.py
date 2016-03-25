@@ -240,8 +240,6 @@ def plot_residuals_byobs(modfile, outfile=None):
     
     rms = model.residuals_percent.std()
     mad = grandsol.utils.MAD(model.residuals_percent.values)
-
-    print rms, mad
     
     waverange = model['wav_obs'].max() - model['wav_obs'].min()
     crop_low = model['wav_obs'].min() + 0.05*waverange
