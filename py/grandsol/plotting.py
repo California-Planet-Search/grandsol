@@ -1,6 +1,7 @@
 import pylab as pl
 from matplotlib import cm
 import matplotlib
+from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import pandas as pd
 import os
@@ -185,38 +186,12 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
 
-
-def plot_mean_residuals(modfile):
-
-    outdf = pd.DataFrame()
-        
-    model = grandsol.io.read_modfile(modfile)
-    
-    pixmean = model.groupby('pixel', as_index=False).mean()
-    pixmean['residuals'] = pixmean['residuals'] = (pixmean['spec'] - (pixmean['model']*pixmean['cont'])) / pixmean['smooth_cont']
-    pixmean['residuals_x10'] = pixmean['residuals'] * 10
-    pixmean['residuals_percent'] = pixmean['residuals'] * 100
-    pixmean['normspec'] = pixmean['spec'] / pixmean['smooth_cont']
-    pixmean['normmod'] = pixmean.residuals + pixmean.normspec
-    
-    #pixmean.plot('wav_star', 'normspec', color='k', lw=0.5)
-    #ax = pl.gca()
-    #pixmean.plot('wav_star', 'normmod', color='b', linestyle='--', ax=ax)
-    pixmean.plot('wav_star', 'residuals_percent', color='r', lw=1)
-    #ax = pl.gca()
-    #pixmean.plot('wav_obs', 'residuals_percent', color='b', lw=1, ax=ax)
-
-    pl.annotate('$\sigma_m$ residuals = %.3g %%' % grandsol.utils.MAD(pixmean.residuals_percent.values), xy=(0.7, 0.05), xycoords='axes fraction')
-    pl.ylabel('Relative Flux [%]')
-    #pl.ylim(-0.003, 0.003)
-    pl.ylim(-0.3, 0.3)
-    pl.title(modfile)
-
 def plot_residuals_byobs(modfile, outfile=None):
     print "Plotting residuals contained in %s" % modfile
     
     model = grandsol.io.read_modfile(modfile)
-
+    order = int(modfile.split('.')[1])
+    
     model['residuals'] = (model['spec'] - (model['model']*model['cont'])) / model['smooth_cont']
     model['residuals_percent'] = model['residuals'] * 100
 
@@ -231,6 +206,7 @@ def plot_residuals_byobs(modfile, outfile=None):
 
         pl.subplot(211)
         pl.plot(singleobs['wav_obs'],singleobs['residuals_percent'], 'k.', markersize=0.4, rasterized=True)
+        pl.title('order %d' % order)
         ax_obs = pl.gca()
     
         pl.subplot(212)
@@ -301,3 +277,59 @@ def plot_resMAD_byiter(runname, obdf, orders, iters=[1,2,3,4,5,6,7,8,9,10], outf
             
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
+
+
+def plot_template_byiter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10]):
+
+    zoomwidth = 5.0
+    
+    def _specplot(temp):
+        pl.plot(temp['wav'], temp['solar'], '-', color='b', alpha=0.3)
+        pl.plot(temp['wav'], temp['temp'], 'k-')
+        pl.plot(temp['wav'], temp['temp_prev'], '--', color='0.7')
+    
+        pl.plot(temp['wav'], temp['diff'], '-', color='red')
+
+        pl.ylim(-0.2, 1.05)
+    
+        ax = pl.gca()
+    
+        return ax
+
+    for o in orders:
+        with PdfPages('%s_%02d_temp_byiter.pdf' % (runname, o)) as pdf:
+            for i in iters:
+
+                tempfile = 'iter%02d/%s.%02d.99.tem' % (i, runname, o)
+                prev_tempfile = 'iter%02d/%s.%02d.99.tem' % (i-1, runname, o)
+                temp = grandsol.io.read_temfile(tempfile)
+        
+                if i == 1: temp.temp_prev = np.ones_like(temp.temp)
+                else: temp.temp_prev = grandsol.io.read_temfile(prev_tempfile).temp
+        
+                deep_line = temp.wav[temp.temp.argmin()]
+
+                zoomreg = np.array([-1,1]) * zoomwidth + deep_line
+
+                temp_lastiter = temp.temp_prev
+        
+                temp['diff'] = (temp.temp - temp.temp_prev) * 100
+                temp['diff'] -= temp['diff'].mean()
+
+                pl.subplot(2,1,1)
+                ax = _specplot(temp)
+                pl.axvspan(*zoomreg, color='0.8')
+                pl.xlim(temp.wav[1:-1].min(), temp.wav[1:-1].max())
+                pl.title(tempfile)
+
+                pl.subplot(2,1,2)
+                ax = _specplot(temp)
+                pl.xlim(zoomreg)
+                pl.xlabel('Wavelength [$\AA$]')
+
+                pl.legend(['solar spectrum', 'current template', 'previous template', '100$\\times$(current-previous)'], loc='best')
+
+                pdf.savefig()
+                pl.close()
+                
+    

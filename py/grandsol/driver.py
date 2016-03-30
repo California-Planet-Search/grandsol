@@ -103,5 +103,7 @@ def run_iterations(opt, ppserver=None):
         os.chdir(rundir)
 
         grandsol.plotting.velplot_by_iter(runname, runorders, outfile='iGrand_%s_velbyiter.pdf' % opt.star, iters=iterdone)
+        grandsol.plotting.plot_template_byiter(runname, runorders, iters=iterdone)
 
     grandsol.plotting.plot_resMAD_byiter(runname, obdf, runorders, iters=iterdone, outfile="%s_resMAD_byiter.pdf" % runname)
+

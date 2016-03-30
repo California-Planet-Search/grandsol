@@ -162,3 +162,13 @@ def read_modfile(modfile):
                                 'smooth_cont', 'badflag', 'tellflag', 'metflag'])
 
     return model
+
+def read_temfile(temfile):
+    temp = pd.read_csv(temfile, sep=' ', skipinitialspace=True, names=['inode', 'wav', 'temp', 'temp_prev', 'solar'])
+    
+    temp.drop_duplicates(subset=['temp', 'temp_prev'], inplace=True, keep=False)
+    
+    temp.temp *= temp.solar.mean()
+    temp.temp_prev *= temp.solar.mean()
+    
+    return temp
