@@ -280,15 +280,16 @@ def plot_resMAD_byiter(runname, obdf, orders, iters=[1,2,3,4,5,6,7,8,9,10], outf
 
 
 def plot_template_byiter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10]):
-
+    pl.clf()
+    
     zoomwidth = 5.0
     
     def _specplot(temp):
-        pl.plot(temp['wav'], temp['solar'], '-', color='b', alpha=0.3)
-        pl.plot(temp['wav'], temp['temp'], 'k-')
-        pl.plot(temp['wav'], temp['temp_prev'], '--', color='0.7')
+        pl.plot(temp['wav'], temp['solar'], '-', color='b', alpha=0.3, lw=2)
+        pl.plot(temp['wav'], temp['temp'], 'k-', lw=2)
+        pl.plot(temp['wav'], temp['temp_prev'], '--', color='0.7', lw=2)
     
-        pl.plot(temp['wav'], temp['diff'], '-', color='red')
+        pl.plot(temp['wav'], temp['diff'], '-', color='red', lw=2)
 
         pl.ylim(-0.2, 1.05)
     
