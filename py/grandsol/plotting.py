@@ -10,18 +10,18 @@ import grandsol
 default_size = (14,10)
 cmap = cm.jet
 
-def fit51peg(vdf):
+def fit51peg(vdf, tc, per):
     import radvel
     import copy
     from scipy import optimize
     
     time_base = 2450000
     params = radvel.RVParameters(1,basis='per tc secosw sesinw logk')
-    params['per1'] = 4.230785
-    params['tc1'] = 2450001.9156
+    params['per1'] = per
+    params['tc1'] = tc
     params['secosw1'] = 0.00 
     params['sesinw1'] = 0.00
-    params['logk1'] = np.log(55.)
+    params['logk1'] = np.log(25.)
     params['dvdt'] = 0
     params['curv'] = 0
     mod = radvel.RVModel(params, time_base=time_base)
@@ -95,6 +95,46 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
 
+def truthplot(runname, truthvel, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+    fig = pl.figure(figsize=default_size)
+    colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(iters))]
+    
+    workdir = os.getcwd()
+    sigmas = []
+    for i in iters:
+        idir = "iter%02d" % i
+        if os.path.exists(idir):
+            os.chdir(idir)
+            obdf = grandsol.io.read_obslist('obslist_%02d' % i)
+        else:
+            print "WARNING: %s does not exist" % idir
+            continue
+            
+        try:
+            vdf = grandsol.io.combine_orders(runname, obdf, orders)
+            vdf['truthvel'] = truthvel
+            vdf['diff'] = vdf['mnvel'] - vdf['truthvel']
+        except IOError:
+            continue
+
+        sdf = vdf.sort_values('truthvel')
+
+        pl.plot(sdf['truthvel'], sdf['diff'], '-', color=colors[i-1], lw=2)
+        sigmas.append(grandsol.utils.MAD(vdf['diff']))
+        
+        os.chdir(workdir)
+
+    legendlabels = ["iter%d: $\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(iters,sigmas)]
+    
+    pl.legend(legendlabels, loc='upper right', fontsize=14)
+    pl.title(runname + "  residuals relative to input")
+    pl.ylabel('measured velocity - input velocity [m/s]')
+    pl.xlabel('input velocity [m/s]')
+
+    if outfile == None: pl.show()
+    else: pl.savefig(outfile)
+
+
 def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
     fig = pl.figure(figsize=default_size)
     colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(iters))]
@@ -113,7 +153,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
             vdf = grandsol.io.combine_orders(runname, obdf, orders)
             diff = np.sum(((vdf['mnvel'] - prev) / vdf['errvel'])**2)
             prev = vdf['mnvel']
-            print i, diff
+            #print i, diff
         except IOError:
             continue
 
@@ -149,12 +189,12 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
             vdf = grandsol.io.combine_orders(runname, obdf, orders)
             diff = np.sum(((vdf['mnvel'] - prev) / vdf['errvel'])**2)
             prev = vdf['mnvel']
-            print i, diff
+            #print i, diff
         except IOError:
             continue
 
         vdf['jd'] += 2440000
-        post = fit51peg(vdf)
+        post = fit51peg(vdf, tc, per)
         tc = post.params['tc1']
         per = post.params['per1']
         
@@ -181,7 +221,7 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
 
     legendlabels = ["iteration %d\n$K=%.1f$ MAD=%.1f m s$^{-1}$" % (i,k,s) for i,k,s in zip(iters,Klist,sigmas)]
     
-    pl.legend(legendlabels, loc='best')
+    pl.legend(legendlabels, loc='best', fontsize=12)
     pl.title(runname + " iterations")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
