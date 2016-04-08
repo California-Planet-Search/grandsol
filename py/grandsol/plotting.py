@@ -11,63 +11,42 @@ import grandsol
 default_size = (14,10)
 cmap = cm.jet
 
-def fit51peg(vdf, tc, per):
-    import radvel
-    import copy
-    from scipy import optimize
-    
-    time_base = 2450000
-    params = radvel.RVParameters(1,basis='per tc secosw sesinw logk')
-    params['per1'] = per
-    params['tc1'] = tc
-    params['secosw1'] = 0.00 
-    params['sesinw1'] = 0.00
-    params['logk1'] = np.log(25.)
-    params['dvdt'] = 0
-    params['curv'] = 0
-    mod = radvel.RVModel(params, time_base=time_base)
-
-    like = radvel.likelihood.RVLikelihood(mod, vdf['jd'], vdf['mnvel'], vdf['errvel'])
-    like.params['gamma'] = 0.0
-    like.params['logjit'] = np.log(1)
-
-    like.vary['dvdt'] = False
-    like.vary['curv'] = False
-
-    post = radvel.posterior.Posterior(like)
-    post0 = copy.deepcopy(post)
-
-    post.priors += [radvel.prior.EccentricityPrior( 1 )] # Keeps eccentricity < 1
-
-    res  = optimize.minimize(post.neglogprob_array, post.get_vary_params(), method='Powell',
-                         options=dict(maxiter=100000,maxfev=100000,xtol=1e-8) )
-
-    print "Initial loglikelihood = %f" % post0.logprob()
-    print "Final loglikelihood = %f" % post.logprob()
-    #post.params = post.params.basis.to_cps(post.params)
-    print post
-
-    #print post.params.basis.to_cps(post.params)
-
-    return post
-    
-def foldData(bjd,e,p,cat=False):
-    tt = bjd - e
-    ncycles = tt/p
-    roundcycles = np.floor(ncycles)
-    phase = (tt-(roundcycles*p))/p
-
-    if cat:
-        phase = np.concatenate((phase,phase+1))
-
-    return phase
-
 def velplot_mean(vdf, fmt='s', color='k'):
+    """
+    The standard RV time series plot for `iGrand`
+
+    Args:
+        vdf (DataFrame): containing 'jd', 'mnvel', and 'errvel' columns at a minumum
+        fmt (string): (optional) matplotlib.plot format code to determine marker shape
+        color (string): (optional) marker color
+
+    Returns:
+        None
+    """
+    
     pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, color=color, markersize=10, markeredgewidth=1)
     pl.ylabel('RV [m$^{-1}$]')
     pl.xlabel('HJD$_{\\rm UTC}$ - 2440000')
 
 def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
+    """
+
+    Plot the RV time series for all orders from a single ``iGrand`` iteration.
+
+    Args:
+        runname (string): name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
+        obdf (DataFrame): observation list data frame as output by ``grandsol.io.read_obslist``
+        orders (list): list of orders to combine to derive the RVs for each iteration
+        outfile (string): (optional) name of the output file. If not given the plot
+        will be displayed in an interactive window.
+        vsbc (bool): (optional) plot RVs with barycentric correction on the x-axis instead of time
+
+    Returns:
+        None
+
+    """
+
+    
     fig = pl.figure(figsize=default_size)
     colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(orders))]
     
@@ -97,6 +76,24 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
     else: pl.savefig(outfile)
 
 def truthplot(runname, truthvel, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+    """
+
+    Plot the RV residuals relative to the input `truth` velocity as provided in the input obslist.
+
+    Args:
+        runname (string): name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
+        truthvel (array): known radial velocity for each observation
+        orders (list): list of orders to combine to derive the RVs for each iteration
+        iters (list): (optional) list of iteration numbers (starting with 1, not 0)
+        outfile (string): (optional) name of the output file. If not given the plot
+        will be displayed in an interactive window.
+
+    Returns:
+        None
+
+    """
+
+    
     fig = pl.figure(figsize=default_size)
     colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(iters))]
     
@@ -137,6 +134,23 @@ def truthplot(runname, truthvel, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=N
 
 
 def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+    """
+
+    Plot the RV time-series for ``iGrand`` iterations.
+
+    Args:
+        runname (string): name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
+        orders (list): list of orders to combine to derive the RVs for each iteration
+        iters (list): (optional) list of iteration numbers (starting with 1, not 0)
+        outfile (string): (optional) name of the output file. If not given the plot
+        will be displayed in an interactive window.
+
+    Returns:
+        None
+
+    """
+
+    
     fig = pl.figure(figsize=default_size)
     colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(iters))]
     
@@ -172,6 +186,26 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
     else: pl.savefig(outfile)
 
 def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+    """
+
+    Fit an RV orbit model and plot the ``grand`` RVs as a function of orbital phase for each ``iGrand`` iteration.
+
+    Args:
+        runname (string): name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
+        obdf (DataFrame): observation list data frame as output by ``grandsol.io.read_obslist``
+        orders (list): list of orders to combine to derive the RVs for each iteration
+        tc (float): time of inferior conjunction (i.e. time of transit if transiting)
+        per (float): orbital period in days
+        iters (list): (optional) list of iteration numbers (starting with 1, not 0)
+        outfile (string): (optional) name of the output file. If not given the plot
+        will be displayed in an interactive window.
+
+    Returns:
+        None
+
+    """
+
+    
     fig = pl.figure(figsize=default_size)
     colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(iters))]
     
@@ -195,17 +229,17 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
             continue
 
         vdf['jd'] += 2440000
-        post = fit51peg(vdf, tc, per)
+        post = grandsol.utils.orbfit(vdf, tc, per)
         tc = post.params['tc1']
         per = post.params['per1']
         
-        phase = foldData(vdf['jd'], tc, per, cat=True) - 1
+        phase = grandsol.utils.foldData(vdf['jd'], tc, per, cat=True) - 1
         vcat = np.append(vdf['mnvel'], vdf['mnvel'])
         ecat = np.append(vdf['errvel'], vdf['errvel'])
 
         modt = np.linspace(-0.5, 0.5, 10000) * per + tc
         mod = post.likelihood.model(modt)
-        modp = foldData(modt, tc, per, cat=True) - 1
+        modp = grandsol.utils.foldData(modt, tc, per, cat=True) - 1
         omod = np.argsort(modp)
         mod = np.append(mod,mod)[omod]
 
@@ -228,6 +262,21 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
     else: pl.savefig(outfile)
 
 def plot_residuals_byobs(modfile, outfile=None):
+    """
+
+    Plot spectral flux residuals for all observations on a single plot for each order.
+
+    Args:
+        modfile (string): name of the .mod file that contains the residuals for all observations and a single order (e.g. iGrand_sun.08.99.mod)
+        outfile (string): (optional) name of the output file. If not given the plot
+        will be displayed in an interactive window.
+
+    Returns:
+        None
+
+    """
+
+    
     print "Plotting residuals contained in %s" % modfile
     
     model = grandsol.io.read_modfile(modfile)
@@ -286,7 +335,23 @@ def plot_residuals_byobs(modfile, outfile=None):
 
 
 def plot_resMAD_byiter(runname, obdf, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+    """
 
+    Plot the MAD of the flux residuals as a function of ``iGrand`` iteration number.
+
+    Args:
+        runname (string): name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
+        orders (list): list of orders to include on the plot
+        iters (list): (optional) list of iteration numbers (starting with 1, not 0)
+        outfile (string): (optional) name of the output file. If not given the plot
+        will be displayed in an interactive window.
+
+    Returns:
+        None
+
+    """
+
+    
     colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(orders))]
     MADarr = np.zeros((len(iters), len(orders)))
         
@@ -321,6 +386,23 @@ def plot_resMAD_byiter(runname, obdf, orders, iters=[1,2,3,4,5,6,7,8,9,10], outf
 
 
 def plot_template_byiter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10]):
+    """
+
+    Plot template evolution as a funciton of ``iGrand`` iteration.
+    This will create a multi-page PDF showing the changes in the template
+    relative to the last iteration.
+
+    Args:
+        runname (string): Name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
+        orders (list): list of orders to make plots. Will create a separate multi-page PDF file for each order
+        iters (list): list of iteration numbers (starting with 1, not 0)
+
+    Returns:
+        None
+
+    """
+
+    
     pl.clf()
     
     zoomwidth = 5.0

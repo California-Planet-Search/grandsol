@@ -77,3 +77,82 @@ def clipped_mean(s, sigma=5, inweights=None, iterations=10, cenfunc=np.median, v
         ref = m.copy()
 
     return m
+
+def orbfit(vdf, tc, per):
+    """
+    Wrapper function to perform a maximum-liklihood fit of an orbital model to RVs contained in a DataFrame output by
+    ``grandsol.io.combine_orders``. Depends on the ``radvel`` radial velocity fitting package be installed in in the PYTHONPATH.
+
+    Args:
+        vdf (DataFrame): as output by ``grandsol.io.combine_orders``
+        tc (float): time of inferior conjunction (i.e. time of transit if transiting)
+        per (float): orbital period in days
+
+    Returns:
+        radvel.Posterior: Posterior object containing the best-fitting parameters.
+
+    """
+    
+    import radvel
+    import copy
+    from scipy import optimize
+    
+    time_base = 2450000
+    params = radvel.RVParameters(1,basis='per tc secosw sesinw logk')
+    params['per1'] = per
+    params['tc1'] = tc
+    params['secosw1'] = 0.00 
+    params['sesinw1'] = 0.00
+    params['logk1'] = np.log(25.)
+    params['dvdt'] = 0
+    params['curv'] = 0
+    mod = radvel.RVModel(params, time_base=time_base)
+
+    like = radvel.likelihood.RVLikelihood(mod, vdf['jd'], vdf['mnvel'], vdf['errvel'])
+    like.params['gamma'] = 0.0
+    like.params['logjit'] = np.log(1)
+
+    like.vary['dvdt'] = False
+    like.vary['curv'] = False
+
+    post = radvel.posterior.Posterior(like)
+    post0 = copy.deepcopy(post)
+
+    post.priors += [radvel.prior.EccentricityPrior( 1 )] # Keeps eccentricity < 1
+
+    res  = optimize.minimize(post.neglogprob_array, post.get_vary_params(), method='Powell',
+                         options=dict(maxiter=100000,maxfev=100000,xtol=1e-8) )
+
+    print "Initial loglikelihood = %f" % post0.logprob()
+    print "Final loglikelihood = %f" % post.logprob()
+    #post.params = post.params.basis.to_cps(post.params)
+    print post
+
+    #print post.params.basis.to_cps(post.params)
+
+    return post
+    
+def foldData(bjd,e,p,cat=False):
+    """
+    Phase fold an RV time series.
+
+    Args:
+        bjd (array): JD timestamps
+        e (float): reference epoch for phase folding. Phase is 0 at this time. We commonly use the time of transit.
+        p (float): orbital period in days
+        cat (bool): (optional) contatenate phase and phase+1 for situations whre you might want to plot two orbits
+
+    Returns:
+        array: orbital phase corresponding to the JD timestamps contained in the bjd argument
+    """
+
+    
+    tt = bjd - e
+    ncycles = tt/p
+    roundcycles = np.floor(ncycles)
+    phase = (tt-(roundcycles*p))/p
+
+    if cat:
+        phase = np.concatenate((phase,phase+1))
+
+    return phase
