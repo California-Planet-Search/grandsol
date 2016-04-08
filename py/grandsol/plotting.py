@@ -479,7 +479,7 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
     grlsf_binary = os.path.join(os.environ['GRAND'],"bin","grlsf")
 
     fig = pl.figure(figsize=(20,10))
-    pl.subplots_adjust(wspace=0, hspace=0, right=0.95)
+    pl.subplots_adjust(wspace=0, hspace=0, right=0.98, left=0.03, bottom=0.15)
 
     for i in iters:
         lsffile = os.path.join("iter%02d" % i, "%s.%02d.99.lsf" % (runname, order))
@@ -487,7 +487,6 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
         cmd = [grlsf_binary, lsffile, str(iobs), str(order), '0']
 
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        p.wait()
 
         lsfdf = grandsol.io.read_grlsf(p.stdout)
 
@@ -515,6 +514,9 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
             ax.yaxis.set_ticklabels([])
             ax.xaxis.set_ticklabels([])
 
+            ylims = pl.ylim()
+            pl.ylim(-0.001, ylims[1])
+            
             pltindex += 1
 
         for n in nodegroups.groups.keys():

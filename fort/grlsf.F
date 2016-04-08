@@ -105,7 +105,7 @@ c size of the supersampled LSF
                 if (o.gt.o_max) o_max = o
                 do j = 001, _JDIM_
                    write(*,119) o, m, k, j, (j-101.0)*0.1, lsfj(j)
-  119              format(2x,i4,1x,i2.2,1x,i1,4x,i3,1x,f5.1,1x,f8.5)
+  119              format(2x,i4,1x,i2.2,1x,i1,4x,i3,1x,f5.1,1x,f13.9)
                    enddo
                 endif
             goto 1
@@ -129,7 +129,7 @@ c size of the supersampled LSF
                call lsfq2lsfj(lsfq,lsfj)
                write(*,'(i2,i4,i4,i3,i2)'),_QDIM_,_JDIM_,o,m,k
                write(*,'(99f9.5)'),(lsfq(q),q=1,_QDIM_)
-               write(*,'(999f9.5)'),(lsfj(j),j=1,_JDIM_)
+               write(*,'(999f13.9)'),(lsfj(j),j=1,_JDIM_)
                stop
                endif
            enddo
