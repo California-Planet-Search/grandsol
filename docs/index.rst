@@ -3,10 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Grand Solution's documentation
+Grand Solution documentation
 ==========================================
 
 .. module:: grandsol
+
 
 Contents:
 
@@ -16,8 +17,8 @@ Contents:
    api
 
 
-Indices and tables
-==================
+Indices and tables for Python code
+====================================
 
 * :ref:`genindex`
 * :ref:`modindex`

@@ -6,9 +6,18 @@ import time
 import pandas as pd
 import numpy as np
 
-def execute(cmd, cwd):
+def execute(cmd, cwd, plotres):
     """
     A thin wrapper for subprocess.Popen
+
+    Args:
+        cmd (string): Shell command to execute
+        cwd (string): Directory where the command will be executed
+        plotres (bool): Make the residual plots?
+
+    Returns:
+        int: error code returned after command execution
+    
     """
     os.chdir(cwd)
     o = int(cmd.split()[3])
@@ -20,7 +29,7 @@ def execute(cmd, cwd):
     errcode = p.returncode
 
     modfile = "%s.%02d.99.mod" % (runname, o)
-    if os.path.isfile(modfile): grandsol.plotting.plot_residuals_byobs(modfile, outfile="%s_%02d_residuals.png" % (runname, o))
+    if os.path.isfile(modfile) and plotres: grandsol.plotting.plot_residuals_byobs(modfile, outfile="%s_%02d_residuals.png" % (runname, o))
     
     lock = subprocess.Popen(["echo 'End Time: '`date`'\nreturn code: %s' >> order_%02d.run" % (errcode,o)], shell=True)
     time.sleep(2)
@@ -29,6 +38,24 @@ def execute(cmd, cwd):
     return errcode
     
 def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, orders=[1,2,3,4,5,6,7,8,9,10,11,12], plotres=False):
+    """
+    Run ``grand`` for several orders simultaneously.
+
+    Args:
+        runname (string): name of current run
+        obslist (string): name of obslist file
+        ppserver (pp.Server): Parallel Python server object to send jobs
+        overwrite (bool): overwrite previous run?
+        fudge (bool): Apply the fudge factor?
+        orders (list): list of orders to be run
+        plotres (bool): make the residual plots?
+
+    Returns:
+        tuple: orders that succesfully finished, and the list of jobs sent
+
+    """
+    
+    
     jobs = []
     good_orders = []
     for o in orders:
@@ -41,7 +68,7 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, ord
                 execute(cmd, cwd)
             else:
                 print "Running command: '%s'" % cmd
-                jobs.append(ppserver.submit(execute, (cmd,cwd), modules=('subprocess','os', 'time', 'grandsol')))
+                jobs.append(ppserver.submit(execute, (cmd,cwd,plotres), modules=('subprocess','os', 'time', 'grandsol')))
         else:
             f = open('order_%02d.done' % o, 'r')
             for l in f.readlines():
@@ -64,6 +91,19 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, ord
     return good_orders, jobs
             
 def run_iterations(opt, ppserver=None):
+    """
+    Run ``iGrand`` iterations
+
+    Args:
+        opt (argparse.ArgumentParser): command line arguments object from argparse
+        ppserver (pp.Server): Parallel Python server object where jobs will be sent
+
+    Returns:
+        None
+
+    """
+
+    
     if opt.obslist != None:
         f = open(opt.obslist, 'r')
         for l in f.readlines():

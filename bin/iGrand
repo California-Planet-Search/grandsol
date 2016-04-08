@@ -33,8 +33,8 @@ def args():
                         help="""Plot phase-folded velocities and best-fit orbital model.
                         Two arguments must follow this flag: period and time of inferior conjunction (i.e. time of transit). [None]""",
                         default=None, nargs=2, type=float, metavar=('Period','Tc'))
-    parser.add_argument('--plotres', dest='plotres',action='store_true',help='Plot residuals and evolution of residuals (slow). [False]',default=False)
-    parser.add_argument('--plottemp', dest='plottemp',action='store_true',help='Plot template and evolution. [False]',default=False)
+    parser.add_argument('--plotres', dest='plotres',action='store_true',help='Plot residuals and evolution of residuals (slow). [False]', default=False)
+    parser.add_argument('--plottemp', dest='plottemp',action='store_true',help='Plot template and evolution. [False]', default=False)
 
     
     opt = parser.parse_args()

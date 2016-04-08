@@ -16,6 +16,26 @@ import sys
 import os
 import shlex
 
+html_theme = 'sphinx_rtd_theme'
+#html_theme = 'alabaster'
+#html_sidebars = {
+#    '**': [
+#        'about.html',
+#        'navigation.html',
+#        'searchbox.html'
+#    ]
+#}
+
+#html_theme_options =  {
+#'github_user' : 'California-Planet-Search',
+#'github_repo' : 'grandsol',
+#'github_type' : 'watch',
+#'github_button': False,
+#'page_width' : '75%',
+#'code_font_size' : '0.em'
+#}
+
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -114,7 +134,7 @@ todo_include_todos = False
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'alabaster'
+#html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -152,7 +172,7 @@ html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
-#html_last_updated_fmt = '%b %d, %Y'
+html_last_updated_fmt = '%b %d, %Y'
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.

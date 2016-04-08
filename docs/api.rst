@@ -1,10 +1,12 @@
 .. _api:
 
-API
+API for the grandsol Python package
 ==========================================
 
 .. toctree::
    :maxdepth: 1
 
+   driver
    io
    utils
+   plotting

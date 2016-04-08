@@ -5,6 +5,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import pandas as pd
 import os
+import subprocess
 import grandsol
 
 default_size = (14,10)
@@ -373,4 +374,88 @@ def plot_template_byiter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10]):
                 pdf.savefig()
                 pl.close()
                 
+                
+def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
+    """
+
+    Plot LSF evolution for a single echelle order and single observation as a funciton of ``iGrand`` iteration.
+    Colors move from blue to red with increasing iteration number.
+
+    Args:
+        runname (string): Name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
+        iobs (int): observation index from obslist (starting with 1, not 0)
+        order (int): order index (starting with 1, not 0)
+        iters (list): list of iteration numbers (starting with 1, not 0)
+
+    Returns:
+        matplotlib.figure.Figure: resulting matplotlib figure object
+
+    """
+
+    colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(iters))]
     
+    grlsf_binary = os.path.join(os.environ['GRAND'],"bin","grlsf")
+
+    fig = pl.figure(figsize=(20,10))
+    pl.subplots_adjust(wspace=0, hspace=0, right=0.95)
+
+    for i in iters:
+        lsffile = os.path.join("iter%02d" % i, "%s.%02d.99.lsf" % (runname, order))
+
+        cmd = [grlsf_binary, lsffile, str(iobs), str(order), '0']
+
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p.wait()
+
+        lsfdf = grandsol.io.read_grlsf(p.stdout)
+
+        numnodes = lsfdf['node'].max()
+
+        nodegroups = lsfdf.groupby('node')
+        if i == iters[0]:
+            prevgroups = nodegroups
+            continue
+
+        pltindex = 1
+
+        axlist = []
+        for n in nodegroups.groups.keys():
+            nodelsf = nodegroups.get_group(n)
+
+            pl.subplot(2, numnodes, pltindex)
+            pl.plot(nodelsf['dj'], nodelsf['lsf'], '-', lw=2, color=colors[i-1])
+
+            ax = pl.gca()
+            axlist.append(ax)
+            if n == 1:
+                pl.ylabel('PSF')
+
+            ax.yaxis.set_ticklabels([])
+            ax.xaxis.set_ticklabels([])
+
+            pltindex += 1
+
+        for n in nodegroups.groups.keys():
+            nodelsf = nodegroups.get_group(n)
+            prevlsf = prevgroups.get_group(n)
+
+            pl.subplot(2, numnodes, pltindex, sharex=axlist[n-1])
+            pl.plot(nodelsf['dj'], nodelsf['lsf']-prevlsf['lsf'], lw=2, color=colors[i-1])
+
+            ax = pl.gca()
+            if n == 1:
+                pl.ylabel('PSF$_{i}$ - PSF$_{i-1}$')
+
+            ax.yaxis.set_ticklabels([])
+            ax.xaxis.set_ticklabels([])
+
+            pl.xlabel('node %d' % n)
+
+            pltindex += 1
+
+        prevgroups = nodegroups
+
+    pl.annotate('Pixel Offset', xy=(0.5, 0.03), xycoords='figure fraction', horizontalalignment='center', fontsize=24)
+    pl.suptitle('order: %d, observation index: %d' % (order, iobs))
+
+    return pl.gcf()

@@ -163,7 +163,6 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False):
 
     w = 1/warr.mean(axis=1)
     w /= w.max()
-    print w
     
     #vdf['mnvel'] = relvel.mean().values()
     #vdf['mnvel'] = np.average(relvel.values(), weights=w, axis=0)
@@ -216,3 +215,22 @@ def read_temfile(temfile):
     temp.temp_prev *= temp.solar.mean()
     
     return temp
+
+def read_grlsf(lsffile):
+    """
+    Convert ``grlsf`` output containing PSFs for all nodes accross a single order into a Pandas DataFrame.
+
+    Args:
+        lsffile (string, file buffer, or any object with a read() method): Name of the lsffile,
+                                  or any file buffer like object with a read() method (e.g. stdout from a subprocess.Popen call).
+                                  This must be from a multi-node ``grlsf`` call (final argument = 0)
+
+    Returns:
+        DataFrame corresponding to ``grlsf`` output with columns labeled.
+
+    """
+
+    df = pd.read_csv(lsffile, sep=' ', skipinitialspace=True, comment="#", names=['obs', 'order', 'node', 'j', 'dj', 'lsf'])
+
+    return df
+
