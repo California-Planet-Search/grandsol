@@ -479,7 +479,7 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
     grlsf_binary = os.path.join(os.environ['GRAND'],"bin","grlsf")
 
     fig = pl.figure(figsize=(20,10))
-    pl.subplots_adjust(wspace=0, hspace=0, right=0.98, left=0.03, bottom=0.15)
+    pl.subplots_adjust(wspace=0, hspace=0, right=0.98, left=0.04, bottom=0.15)
 
     for i in iters:
         lsffile = os.path.join("iter%02d" % i, "%s.%02d.99.lsf" % (runname, order))
@@ -500,16 +500,20 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
         pltindex = 1
 
         axlist = []
+        centroids = []
         for n in nodegroups.groups.keys():
             nodelsf = nodegroups.get_group(n)
 
-            pl.subplot(2, numnodes, pltindex)
+            pl.subplot(3, numnodes, pltindex)
             pl.plot(nodelsf['dj'], nodelsf['lsf'], '-', lw=2, color=colors[i-1])
 
+            cen = np.sum(nodelsf['dj']*nodelsf['lsf']) / np.sum(nodelsf['lsf'])
+            centroids.append(cen)
+            
             ax = pl.gca()
             axlist.append(ax)
             if n == 1:
-                pl.ylabel('PSF')
+                pl.ylabel('PSF$_{i}$')
 
             ax.yaxis.set_ticklabels([])
             ax.xaxis.set_ticklabels([])
@@ -523,7 +527,7 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
             nodelsf = nodegroups.get_group(n)
             prevlsf = prevgroups.get_group(n)
 
-            pl.subplot(2, numnodes, pltindex, sharex=axlist[n-1])
+            pl.subplot(3, numnodes, pltindex, sharex=axlist[n-1])
             pl.plot(nodelsf['dj'], nodelsf['lsf']-prevlsf['lsf'], lw=2, color=colors[i-1])
 
             ax = pl.gca()
@@ -533,13 +537,34 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
             ax.yaxis.set_ticklabels([])
             ax.xaxis.set_ticklabels([])
 
-            pl.xlabel('node %d' % n)
+            pltindex += 1
 
+        for n in nodegroups.groups.keys():
+            pl.subplot(3, numnodes, pltindex)
+            
+            pl.plot(centroids[n-1], i, 'o', color=colors[i-1])
+            #if i == iters[1] or i == iters[-1]:
+            #    pl.annotate("%4.3f" % centroids[n-1], xy = (centroids[n-1], i), xytext=(-40,0),
+            #            xycoords='data', textcoords='offset points', fontsize=10, ha='center')
+            
+            ax = pl.gca()
+            axlist.append(ax)
+            if n == 1:
+                pl.ylabel('centroid$_{i}$')
+
+            ax.yaxis.set_ticklabels([])
+            ax.xaxis.set_ticklabels([])
+            #ax.tick_params(labelsize=8)
+            #ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%4.2f'))
+
+            pl.ylim(0,max(iters)+1)
+            pl.xlabel('node %d' % n)
+            
             pltindex += 1
 
         prevgroups = nodegroups
 
     pl.annotate('Pixel Offset', xy=(0.5, 0.03), xycoords='figure fraction', horizontalalignment='center', fontsize=24)
-    pl.suptitle('order: %d, observation index: %d' % (order, iobs))
+    pl.suptitle('%s: order: %d, observation index: %d' % (runname, order, iobs))
 
     return pl.gcf()

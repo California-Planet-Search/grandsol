@@ -36,8 +36,8 @@ def main():
 
     fig = grandsol.plotting.plot_lsf_byiter(opt.runname, opt.obs, opt.order)
 
+    pl.savefig("%s_%03d_%02d_lsf_byiter.png" % (opt.runname, opt.obs, opt.order))
     if opt.show: pl.show()
-    pl.savefig("%s_%02d_lsf_byiter.pdf" % (opt.runname, opt.order))
 
 if __name__ == '__main__':
     main()
