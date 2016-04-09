@@ -8,5 +8,6 @@ API for the grandsol Python package
 
    driver
    io
+   relativity
    utils
    plotting
