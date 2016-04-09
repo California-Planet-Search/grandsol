@@ -20,20 +20,12 @@ Sample environment variables and aliases for tcsh:
 
 ```
   setenv GRAND /Users/valenti/git/grandsol
-
   setenv GRAND_REFDIR $GRAND/fref
-
   setenv GRAND_IREFDIR $GRAND/iref
-    
   setenv GRAND_DATADIR /mir3/iodspec
-  
   setenv GRAND_KBCVEL /mir3/bary/kbcvel.ascii
-
   setenv GRANDSOL_IDL_PATH ${MINIMAL_IDL_PATH}:+$GRAND/idl
-
   setenv PYTHONPATH $GRAND/py:$PYTHONPATH  
-
   alias idlgr "env IDL_PATH=$GRANDSOL_IDL_PATH $IDL_DIR/bin/idl"
-
   alias grand ~/git/grandsol/fort/grand
 ```
