@@ -8,7 +8,7 @@ import numpy as np
 
 def execute(cmd, cwd, plotres):
     """
-    A thin wrapper for subprocess.Popen
+    A thin wrapper for subprocess.Popen designed to launch instances of ``grand``
 
     Args:
         cmd (string): Shell command to execute
