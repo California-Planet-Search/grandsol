@@ -12946,8 +12946,9 @@ c
       real    tem0(_SDIM_)
       real    temz(_SDIM_) 
 
+      real    temb(_SDIM_)
       real    temd(_SDIM_)
-      real    temh(_SDIM_)
+      real    temx(_SDIM_)
 
       integer s
       real*8  ww_s
@@ -12959,49 +12960,46 @@ c
          enddo
 
       do s = 0003, _SDIM_-2
-         temz(s) =
-     .           -  0.086*tem0(s-2)
-     .           +  0.343*tem0(s-1)
-     .           +  0.486*tem0(s  )
-     .           +  0.343*tem0(s+1)
-     .           -  0.086*tem0(s+2)
+         temb(s) =  0.333*tem0(s-1)
+     .           +  0.334*tem0(s  )
+     .           +  0.333*tem0(s+1)
+         temd(s) = tem0(s)-temb(s)
          enddo
 
+c 
+c sextic 9-point (7 terms, up to x**6)
+c        
+      do s = 0005, _SDIM_-4
+         temx(s) = 
+     .           -  0.005439*temd(s-4)  
+     .           +  0.043512*temd(s-3)
+     .           -  0.152292*temd(s-2)
+     .           +  0.304584*temd(s-1)
+     .           +  0.619270*temd(s  )
+     .           +  0.304584*temd(s+1)
+     .           -  0.152292*temd(s+2)
+     .           +  0.043512*temd(s+3)
+     .           -  0.005439*temd(s+4)
+         enddo
 
       do s = 0001, _SDIM_
-         if (tems(s).gt.0.875) tems(s) = (temz(s)+8*tem0(s))/09
-         if (tems(s).gt.0.900) tems(s) = (temz(s)+4*tem0(s))/05
-         if (tems(s).gt.0.925) tems(s) = (temz(s)+2*tem0(s))/03
-         if (tems(s).gt.0.950) tems(s) = (temz(s)+1*tem0(s))/02
-         if (tems(s).gt.0.975) tems(s) =  temz(s)
-         enddo
-
-      do s = 0003, _SDIM_-2
-         temd(s) =  0.250*(tems(s-1)-tem0(s-1))
-     .           +  0.500*(tems(s  )-tem0(s  ))
-     .           +  0.250*(tems(s+1)-tem0(s+1))
-         enddo
-
-      do s = 0001, _SDIM_
-         tems(s) = tems(s) - temd(s)
+         tems(s) = temb(s) + temx(s)
          enddo
 
       write(FILENAME,'(''LOG.SMOO_TEM_NIT'',i2.2)') NIT 
-c     open(92,file='LOG.SMOO_TEM',status='unknown')
       open(92,file=FILENAME,status='unknown')
       do s = 0001, _SDIM_
-         write(92,192) s,ww_s(s),tems(s),temz(s),
-     .                           tem0(s),temd(s),
-     .                           temh(s),
-     .                           tems(s)-temh(s),
-     .                           tems(s)-tem0(s)
-         temh(s) = tems(s)
+         write(92,192) s,ww_s(s),tem0(s),tems(s),
+     .                           temb(s),temd(s), temx(s)
   192    format(i6.6,1x,f9.4,1x,8(1x,f8.5))
          enddo
       close(92)
 
       return
       end
+
+
+
 
 
 
