@@ -14,21 +14,37 @@ def args():
     """
     
     parser = argparse.ArgumentParser(description='Run iterative Grand Solution doppler analysis.')
-    parser.add_argument(metavar='star',dest='stars',action='store',help='Star to analyze.',default=[], nargs='*')
-    parser.add_argument(metavar='sysvel',dest='sysvel',action='store',help='Systemic radial velocity to star.',default=0, type=float)
-    parser.add_argument('--obslist',dest='obslist',action='store',help='Use existing obslist file instead of looking for observations in kbcvel.ascii',default=None, type=str)
+    parser.add_argument(metavar='star',dest='star',action='store',help='Star to analyze.', type=str)
+    parser.add_argument(metavar='sysvel',dest='sysvel',action='store',
+                        help='Systemic radial velocity of star. This parameter is not needed and ignored if an input obslist is given.',
+                        nargs='?', default=None, type=float)
+    parser.add_argument('--obslist',dest='obslist',action='store',help='Use existing obslist file instead of creating one from observations found in kbcvel.ascii',
+                        default=None, type=str)
     parser.add_argument('-o', '--overwrite', dest='overwrite',action='store_true',help='Overwrite previous run [False]',default=False)
     parser.add_argument('--nofudge', dest='nofudge',action='store_true',help='Do not apply the fudge [False]',default=False)
-    parser.add_argument('--orders',dest='orders',action='store',help='List of spectral orders to analyze.',default=[2,3,4,5,6,7,8,9,10])
+    parser.add_argument('--orders',dest='orders',action='store',help='List of spectral orders to analyze. [2,3,4,5,6,7,8,9,10]',default=[2,3,4,5,6,7,8,9,10])
     parser.add_argument('--local', dest='local',action='store_true',help='Run on local computer only. [True]',default=True)
     parser.add_argument('--ncpus',dest='ncpus',action='store',help='Number of local CPUs to utilize. [autodetect]',default='autodetect')
-    parser.add_argument('--niter',dest='niter',action='store',help='Number of outer loop iterations.',default=10, type=int)
-    
+    parser.add_argument('--niter',dest='niter',action='store',help='Number of outer loop iterations. [10]',default=10, type=int)
+    parser.add_argument('--truth', dest='truth',action='store_true',
+                        help='Set this flag if "truth" velocities are given in the input obslist.This will create a few extra plots [False]',
+                        default=False)
+    parser.add_argument('--phase', dest='phase',action='store',
+                        help="""Plot phase-folded velocities and best-fit orbital model.
+                        Two arguments must follow this flag: period and time of inferior conjunction (i.e. time of transit). [None]""",
+                        default=None, nargs=2, type=float, metavar=('Period','Tc'))
+    parser.add_argument('--plotres', dest='plotres',action='store_true',help='Plot residuals and evolution of residuals (slow). [False]', default=False)
+    parser.add_argument('--plottemp', dest='plottemp',action='store_true',help='Plot template and evolution. [False]', default=False)
+
     
     opt = parser.parse_args()
     if isinstance(opt.orders, str): opt.orders=eval(opt.orders)
+    assert (opt.obslist != None) or (opt.sysvel != None), "Must give either systemic velocity or input obslist."
     opt.fudge = opt.nofudge == False
-    
+
+    if opt.obslist != None and opt.truth:
+        opt.truthvel = grandsol.io.read_obslist(opt.obslist)['vorb']
+        
     return opt
 
 
@@ -52,11 +68,9 @@ if __name__ == '__main__':
         print "%s\t%s" % (host.ljust(30), nodes[n])
     print "-------------------------------------\n"
 
-
-    for star in opt.stars:
-        print "Running iGrand for star:", star
-        opt.star = star
-        grandsol.driver.run_iterations(opt, server)
+    
+    print "Running iGrand for star:", opt.star
+    grandsol.driver.run_iterations(opt, server)
     
 
         
