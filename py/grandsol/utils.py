@@ -49,8 +49,7 @@ def clipped_mean(s, sigma=5, inweights=None, iterations=10, cenfunc=np.median, v
                             as a variance. Defaults to the MAD.
         verbose (bool): Print message indicating number of masked outliers
     Returns:
-        numpy.masked.MaskedArray: A masked array with a shape matching the
-        input that is masked where the algorithm has rejected those values.
+        tuple: (A numpy array collapsed along the 0th axis, and weight matrix)
         
     """
     # Calcualte and subtract reference
@@ -76,7 +75,7 @@ def clipped_mean(s, sigma=5, inweights=None, iterations=10, cenfunc=np.median, v
         
         ref = m.copy()
 
-    return m
+    return m,weights
 
 def orbfit(vdf, tc, per):
     """

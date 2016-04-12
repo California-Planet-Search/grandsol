@@ -51,15 +51,22 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
     colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(orders))]
     
     vdf, relvel = grandsol.io.combine_orders(runname, obdf, orders, varr_byorder=True)
-
+    weights = grandsol.io.combine_orders(runname, obdf, orders, get_weights=True)
+    allbad = weights == 0
+    
     sigmas = []
+    plist = []
     for i,o in enumerate(orders):
+        bad = allbad[i,:]
         if vsbc:
-            pl.plot(obdf['bc'], relvel[i,:], 'o', color=colors[i])
+            p, = pl.plot(obdf['bc'], relvel[i,:], 'o', color=colors[i])
+            pl.plot(obdf['bc'][bad], relvel[i,:][bad], 'x', markersize=24, color=colors[i])
         else:
-            pl.plot(vdf['jd'], relvel[i,:], 'o', color=colors[i])
+            p, = pl.plot(vdf['jd'], relvel[i,:], 'o', color=colors[i])
+            pl.plot(vdf['jd'][bad], relvel[i,:][bad], 'x', markersize=24, color=colors[i])
         #sigmas.append(np.std(relvel[i,:]))
         sigmas.append(grandsol.utils.MAD(relvel[i,:]))
+        plist.append(p)
 
     if vsbc:
         pl.errorbar(obdf['bc'], vdf['mnvel'], yerr=vdf['errvel'], fmt='s', color=colors[i], markersize=10, markeredgewidth=1)
@@ -70,7 +77,7 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
 
     legendlabels = ["order %d $\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(orders,sigmas)] + ['Mean $\sigma=%.2f$' % grandsol.utils.MAD(vdf['mnvel'])]
     
-    pl.legend(legendlabels, loc='best')
+    pl.legend(plist, legendlabels, loc='best')
     pl.title(runname + " orders")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
