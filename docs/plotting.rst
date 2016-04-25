@@ -7,4 +7,3 @@ Plotting
 
 .. automodule:: grandsol.plotting
    :members:
-

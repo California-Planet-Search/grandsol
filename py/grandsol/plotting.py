@@ -2,6 +2,9 @@ import pylab as pl
 from matplotlib import cm
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.offsetbox import AnchoredOffsetbox
+from matplotlib.patches import Rectangle
+from matplotlib.offsetbox import AuxTransformBox, VPacker, HPacker, TextArea, DrawingArea
 import numpy as np
 import pandas as pd
 import os
@@ -10,6 +13,87 @@ import grandsol
 
 default_size = (14,10)
 cmap = cm.jet
+
+
+class AnchoredScaleBar(AnchoredOffsetbox):
+    """Class to support scalebars
+
+    Draw a horizontal and/or vertical  bar with the size in data coordinate
+    of the give axes. A label will be drawn underneath (center-aligned).
+
+    Args:
+        transform: the coordinate frame (typically axes.transData)
+        sizex: width of x bar, in data units. 0 to omit
+        sizey: width of y bar, in data units. 0 to omit
+        labelx: label for x bar; None to omit
+        labely: label for y bar; None to omit
+        loc (int): position in containing axes
+        pad (float):  padding, in fraction of the legend font size (or prop)
+        borderpad (float): padding, in fraction of the legend font size (or prop)
+        sep (float): separation between labels and bars in points.
+        **kwargs: additional arguments passed to base class constructor (matplotlib.offsetbox.AnchoredOffsetBox)
+
+    Returns:
+        None
+        
+    """
+
+    def __init__(self, transform, sizex=0, sizey=0, labelx=None, labely=None, loc=4,
+                 pad=0.1, borderpad=0.1, sep=2, prop=None, **kwargs):
+        bars = AuxTransformBox(transform)
+        if sizex:
+            bars.add_artist(Rectangle((0,0), sizex, 0, fc="none"))
+        if sizey:
+            bars.add_artist(Rectangle((0,0), 0, sizey, fc="none"))
+
+        if sizex and labelx:
+            bars = VPacker(children=[bars, TextArea(labelx, minimumdescent=False)],
+                           align="center", pad=0, sep=sep)
+        if sizey and labely:
+            bars = HPacker(children=[TextArea(labely), bars],
+                            align="center", pad=0, sep=sep)
+
+        AnchoredOffsetbox.__init__(self, loc, pad=pad, borderpad=borderpad,
+                                   child=bars, prop=prop, frameon=False, **kwargs)
+
+def add_scalebar(ax, matchx=True, matchy=True, hidex=True, hidey=True, **kwargs):
+    """ Add scalebars to axes
+
+    Adds a set of scale bars to *ax*, matching the size to the ticks of the plot
+    and optionally hiding the x and y axes
+
+    Args:
+        ax (matplotlib.axes): the axis to attach ticks to
+        matchx: if True, set size of scale bars to spacing between ticks, if False, size should be set using sizex
+        matchy: if True, set size of scale bars to spacing between ticks, if False, size should be set using sizey
+        hidex: if True, hide x-axis of parent
+        hidey: if True, hide y-axis of parent
+        **kwargs: additional arguments passed to AnchoredScaleBars
+
+    Returns:
+        AnchoredScaleBar: created scalebar object
+
+    """
+    def f(axis):
+        l = axis.get_majorticklocs()
+        return len(l)>1 and (l[1] - l[0])
+    
+    if matchx:
+        kwargs['sizex'] = f(ax.xaxis)
+        kwargs['labelx'] = str(kwargs['sizex'])
+    if matchy:
+        kwargs['sizey'] = f(ax.yaxis)
+        kwargs['labely'] = str(kwargs['sizey'])
+        
+    sb = AnchoredScaleBar(ax.transData, **kwargs)
+    ax.add_artist(sb)
+
+    if hidex : ax.xaxis.set_visible(False)
+    if hidey : ax.yaxis.set_visible(False)
+
+    return sb
+
+
 
 def velplot_mean(vdf, fmt='s', color='k'):
     """
@@ -51,15 +135,22 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
     colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(orders))]
     
     vdf, relvel = grandsol.io.combine_orders(runname, obdf, orders, varr_byorder=True)
-
+    weights = grandsol.io.combine_orders(runname, obdf, orders, get_weights=True)
+    allbad = weights == 0
+    
     sigmas = []
+    plist = []
     for i,o in enumerate(orders):
+        bad = allbad[i,:]
         if vsbc:
-            pl.plot(obdf['bc'], relvel[i,:], 'o', color=colors[i])
+            p, = pl.plot(obdf['bc'], relvel[i,:], 'o', color=colors[i])
+            pl.plot(obdf['bc'][bad], relvel[i,:][bad], 'x', markersize=24, color=colors[i])
         else:
-            pl.plot(vdf['jd'], relvel[i,:], 'o', color=colors[i])
+            p, = pl.plot(vdf['jd'], relvel[i,:], 'o', color=colors[i])
+            pl.plot(vdf['jd'][bad], relvel[i,:][bad], 'x', markersize=24, color=colors[i])
         #sigmas.append(np.std(relvel[i,:]))
         sigmas.append(grandsol.utils.MAD(relvel[i,:]))
+        plist.append(p)
 
     if vsbc:
         pl.errorbar(obdf['bc'], vdf['mnvel'], yerr=vdf['errvel'], fmt='s', color=colors[i], markersize=10, markeredgewidth=1)
@@ -70,7 +161,7 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
 
     legendlabels = ["order %d $\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(orders,sigmas)] + ['Mean $\sigma=%.2f$' % grandsol.utils.MAD(vdf['mnvel'])]
     
-    pl.legend(legendlabels, loc='best')
+    pl.legend(plist, legendlabels, loc='best')
     pl.title(runname + " orders")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
@@ -426,6 +517,8 @@ def plot_template_byiter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10]):
 
                 tempfile = 'iter%02d/%s.%02d.99.tem' % (i, runname, o)
                 prev_tempfile = 'iter%02d/%s.%02d.99.tem' % (i-1, runname, o)
+                #tempfile = 'iter10/%s.%02d.%02d.tem' % (runname, o, i)
+                #prev_tempfile = 'iter10/%s.%02d.%02d.tem' % (runname, o, i-1)
                 temp = grandsol.io.read_temfile(tempfile)
         
                 if i == 1: temp.temp_prev = np.ones_like(temp.temp)
@@ -478,7 +571,7 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
     
     grlsf_binary = os.path.join(os.environ['GRAND'],"bin","grlsf")
 
-    fig = pl.figure(figsize=(20,10))
+    fig = pl.figure(figsize=(24,12))
     pl.subplots_adjust(wspace=0, hspace=0, right=0.98, left=0.04, bottom=0.15)
 
     for i in iters:
@@ -520,9 +613,11 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
 
             ylims = pl.ylim()
             pl.ylim(-0.001, ylims[1])
+            pl.title('zone %d' % n)
             
             pltindex += 1
 
+        ylimit = 0.0
         for n in nodegroups.groups.keys():
             nodelsf = nodegroups.get_group(n)
             prevlsf = prevgroups.get_group(n)
@@ -534,6 +629,11 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
             if n == 1:
                 pl.ylabel('PSF$_{i}$ - PSF$_{i-1}$')
 
+
+            yr = np.array(pl.ylim())
+            pl.ylim(-np.max(np.abs(yr)), np.max(np.abs(yr)))
+            
+                                
             ax.yaxis.set_ticklabels([])
             ax.xaxis.set_ticklabels([])
 
@@ -542,23 +642,33 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
         for n in nodegroups.groups.keys():
             pl.subplot(3, numnodes, pltindex)
             
-            pl.plot(centroids[n-1], i, 'o', color=colors[i-1])
-            #if i == iters[1] or i == iters[-1]:
-            #    pl.annotate("%4.3f" % centroids[n-1], xy = (centroids[n-1], i), xytext=(-40,0),
-            #            xycoords='data', textcoords='offset points', fontsize=10, ha='center')
+            pl.plot(centroids[n-1], i, 'o', color=colors[i-1], markersize=8)
             
             ax = pl.gca()
             axlist.append(ax)
             if n == 1:
-                pl.ylabel('centroid$_{i}$')
+                pl.ylabel('Iter [$i$]')
 
             ax.yaxis.set_ticklabels([])
             ax.xaxis.set_ticklabels([])
-            #ax.tick_params(labelsize=8)
-            #ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%4.2f'))
-
+            
+            if i == iters[-1]:
+                ar = pl.xlim()[1] - pl.xlim()[0]
+                vsize = 0.0
+                prec = 1.    # for m/s
+                while vsize == 0:
+                    arvel = ar * 1000.
+                    vsize = np.round(arvel*prec / 5) / prec
+                    psize = vsize / 1000.
+                    label = "%s m s$^{-1}$" % vsize
+                    prec *= 10.
+    
+                #print psize, label
+                
+                add_scalebar(ax, hidex=False, hidey=False, matchy=False, matchx=False, sizey=0, sizex=psize, labelx=label, loc=3, sep=5)
+            
             pl.ylim(0,max(iters)+1)
-            pl.xlabel('node %d' % n)
+            pl.xlabel('centroid$_{i}$')
             
             pltindex += 1
 

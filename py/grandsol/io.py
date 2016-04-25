@@ -114,7 +114,7 @@ def read_vel(infile):
     
     return zdf
 
-def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False):
+def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False, get_weights=False):
     """
     Combine velocities from multiple orders by mean and merge with observation information.
 
@@ -124,12 +124,15 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False):
         orders (list): list of orders to combine
         varr_byorder (bool): (optional) return full velocity-by-order array in addition to the normal output
         usevln (bool): (optional) use zln instead of zbarn to calculate velocities
+        get_weights (bool): (optional) return the weight matrix instead of the velocities
 
     Returns:
         DataFrame: Same as obdf with mean velocity (mnvel) and velocity uncertainty (errvel) columns added
         or
         tuple: (vdf, mnvel) mnvel is a len(orders)xlen(observations) array that contains the velocities
                       for each other before taking the mean
+        or
+        array: weight matrix if get_weights==True)
     """
     
     mnvel = []
@@ -167,7 +170,7 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False):
     #vdf['mnvel'] = relvel.mean().values()
     #vdf['mnvel'] = np.average(relvel.values(), weights=w, axis=0)
     #vdf['mnvel'] = np.median(relvel.values(), axis=0)
-    vdf['mnvel'] = grandsol.utils.clipped_mean(relvel.values(), inweights=w, sigma=5)
+    vdf['mnvel'], weight_matrix = grandsol.utils.clipped_mean(relvel.values(), inweights=w, sigma=5)
     
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])
@@ -175,6 +178,7 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False):
     mdf = pd.merge(vdf, obdf, left_index=True, right_on='ind')
 
     if varr_byorder: return (mdf, relvel.vel)
+    elif get_weights: return weight_matrix
     else: return mdf
 
 
