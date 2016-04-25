@@ -109,7 +109,7 @@ pro simobs_set, star, iod, elsf, ech, bcmax, rvk, vsys, ston, nobs $
   printf, unit, "ech = '"  + ech + "'"
   printf, unit, "bcmax = " + strtrim(string(bcmax, form='(f9.2)'), 2) + ' m/s'
   printf, unit, "rvk = " + strtrim(string(rvk, form='(f9.2)'), 2) + ' m/s'
-  printf, unit, "vsys = " + strtrim(string(rvk, form='(f9.2)'), 2) + ' m/s'
+  printf, unit, "vsys = " + strtrim(string(vsys, form='(f9.2)'), 2) + ' m/s'
   printf, unit, "ston = " + strtrim(ston, 2)
   printf, unit, "nobs = " + strtrim(nobs, 2)
   if keyword_set(seed_entry) then begin
