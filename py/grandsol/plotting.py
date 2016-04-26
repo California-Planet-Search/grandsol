@@ -519,6 +519,11 @@ def plot_template_byiter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10]):
                 prev_tempfile = 'iter%02d/%s.%02d.99.tem' % (i-1, runname, o)
                 #tempfile = 'iter10/%s.%02d.%02d.tem' % (runname, o, i)
                 #prev_tempfile = 'iter10/%s.%02d.%02d.tem' % (runname, o, i-1)
+                if not os.path.exists(tempfile):
+                    tempfile = 'iter%02d/%s.%02d.10.tem' % (i, runname, o)
+                    prev_tempfile = 'iter%02d/%s.%02d.10.tem' % (i-1, runname, o)
+
+
                 temp = grandsol.io.read_temfile(tempfile)
         
                 if i == 1: temp.temp_prev = np.ones_like(temp.temp)
