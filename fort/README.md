@@ -302,25 +302,38 @@ Executable is written to the `grandsol/bin` directory.
 
 ## Calling syntax for `grlsf`
 ```
-usage: grlsf lsffile obs m k
+Emulate the LSF node interpolation algorithm used in grand. Calculate an
+oversampled LSF with NJ=201 points from -10.0 to +10.0 pixels in steps of
+0.1 pixel, based on NQ=13 LSF node values specified on the command line
+or in a *.lsf file. Results are written to standard output
 
-Calculate line spread function with NJ=201 points from -10.0 to +10.0 pixels
-in steps of 0.1 pixel, based on NQ=13 LSF node values in the specified *.lsf
-file. The node interpolation algorithm is a copy of what is used in grand. 
+Usage #1: grlsf lsffile o m k
 
-positional arguments:
-  lsffile               *.lsf file produced by grand
-  obs                   observation index from obslist
-  m                     order index (starting with 1, not 0)
-  k                     node index across echelle order (1-9)
+  positional arguments:
+    lsffile             *.lsf file produced by grand
+    o                   0 or observation index from obslist
+    m                   0 or order index (starting with 1)
+    k                   0 or zone along echelle order (1-9)
+    (an input value of 0 prints LSFs for all values of that parameter)
 
-output (written to standard outout):
-  line 1                NQ NJ obs m q
-  line 2                LSF value at NQ=13 nodes
-  line 3                LSF value at NJ=201 interpolated points
+  output if o>0, m>0, and k>0:
+    line 1              NQ NJ o m q
+    line 2              LSF value at NQ=13 nodes
+    line 3              LSF value at NJ=201 interpolated points
 
-notes:
-  Interpolation logic assumes NQ=13 and NJ=201.
+  output if o=0, m=0, or k=0:
+    One oversampled LSF per output line.
+    The output columns are: o m k j dj lsf_j
+
+Usage #2: grlsf ynode1 ynode2 ynode3 ... ynode13
+
+  positional arguments:
+    ynode<q>            LSF node value for node <q>
+
+  output if o>0, m>0, and k>0:
+    line 1              LSF value at NJ=201 interpolated points
+
+Notes:
   m=1 is HIRES order 71 (4977-5065 Angstroms)
   m=16 is HIRES order 56 (6310-6368 Angstroms)
 ```

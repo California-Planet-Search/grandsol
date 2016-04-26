@@ -27,42 +27,62 @@ c size of the supersampled LSF
 64      format(2x,a,t25,a,i3,a)
 65      format(a,i3,a)
 66      format(a,i2,a)
-        if (iargc().ne.4) then
-            write(*,61) 'usage: grlsf lsffile o m k'
+        if (iargc().eq.13) then
+            do q = 01, 13
+               call getarg(q,LSFFILE) 
+               read(LSFFILE,*) lsfq(q)
+               enddo
+            call lsfq2lsfj(lsfq,lsfj)
+           !write(*,'(''#  '',i2,i4,i4,i3,i2)'),_QDIM_,_JDIM_,0,0,0
+           !write(*,'(''#  '',13f9.5)'),(lsfq(q),q=1,_QDIM_)
+            write(*,'(201f13.9)'),(lsfj(j),j=1,_JDIM_)
+            stop
+            endif
+
+        if (iargc().ne.04) then
+            write(*,61) 'Emulate the LSF node interpolation ' //
+     .        'algorithm used in grand. Calculate an'
+            write(*,65) 'oversampled LSF with NJ=', _JDIM_,
+     .        ' points from -10.0 to +10.0 pixels in steps of'
+            write(*,66) '0.1 pixel, based on NQ=', _QDIM_, 
+     .        ' LSF node values specified on the command line'
+            write(*,61) 'or in a *.lsf file. Results are written' //
+     .        ' to standard output'
             write(*,61) ''
-            write(*,65) 'Calculate line spread function with NJ=',
-     .        _JDIM_, ' points from -10.0 to +10.0 pixels'
-            write(*,66) 'in steps of 0.1 pixel, based on NQ=',
-     .        _QDIM_, ' LSF node values in the specified *.lsf'
-            write(*,61) 'file. The node interpolation algorithm' //
-     .        ' is a copy of what is used in grand. '
+            write(*,61) 'Usage #1: grlsf lsffile o m k'
             write(*,61) ''
-            write(*,61) 'positional arguments:'
-            write(*,62) 'lsffile', '*.lsf file produced by grand'
-            write(*,62) 'o', 'observation index from obslist'
-            write(*,62) 'm', 'order index (starting with 1, not 0)'
-            write(*,62) 'k', 'node index across echelle order (1-9)'
+            write(*,61) '  positional arguments:'
+            write(*,62) '  lsffile', '*.lsf file produced by grand'
+            write(*,62) '  o', '0 or observation index from obslist'
+            write(*,62) '  m', '0 or order index (starting with 1)'
+            write(*,62) '  k', '0 or zone along echelle order (1-9)'
+            write(*,61) '    (an input value of 0 prints LSFs for' //
+     .        ' all values of that parameter)'
             write(*,61) ''
-            write(*,61) 'output (written to standard outout):'
-            write(*,62) 'line 1', 'NQ NJ o m q'
-            write(*,63) 'line 2', 'LSF value at NQ=', _QDIM_,
+            write(*,61) '  output if o>0, m>0, and k>0:'
+            write(*,62) '  line 1', 'NQ NJ o m q'
+            write(*,63) '  line 2', 'LSF value at NQ=', _QDIM_,
      .        ' nodes'
-            write(*,64) 'line 3', 'LSF value at NJ=', _JDIM_,
+            write(*,64) '  line 3', 'LSF value at NJ=', _JDIM_,
      .        ' interpolated points'
             write(*,61) ''
-            write(*,61) 'notes:'
-            write(*,61) '  Interpolation logic assumes NQ=13' //
-     .         ' and NJ=201.'
+            write(*,61) '  output if o=0, m=0, or k=0:'
+            write(*,61) '    One oversampled LSF per output line.'
+            write(*,61) '    The output columns are: o m k j dj lsf_j'
+            write(*,61) ''
+            write(*,61) 'Usage #2: grlsf ynode1 ynode2 ynode3' //
+     .        ' ... ynode13'
+            write(*,61) ''
+            write(*,61) '  positional arguments:'
+            write(*,62) '  ynode<q>', 'LSF node value for node <q>'
+            write(*,61) ''
+            write(*,61) '  output if o>0, m>0, and k>0:'
+            write(*,64) '  line 1', 'LSF value at NJ=', _JDIM_,
+     .        ' interpolated points'
+            write(*,61) ''
+            write(*,61) 'Notes:'
             write(*,61) '  m=1 is HIRES order 71 (4977-5065 Angstroms)'
             write(*,61) '  m=16 is HIRES order 56 (6310-6368 Angstroms)'
-            write(*,61) ' '
-            write(*,61) 'If o=0 m=0 or k=0 then it will '
-            write(*,61) '   output all of the data for the zero element'
-            write(*,61) '   of the input file in a simple format:      '
-            write(*,61) '   o m k j dj lsf_j '
-            write(*,61) '           (one line per supersampled node '
-            write(*,61) '            of the LSF)'
-            write(*,61) ' '
             stop
             endif
 
