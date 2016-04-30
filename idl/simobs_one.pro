@@ -1,5 +1,5 @@
 pro simobs_one, star, iod, elsf, ech, velsum, ston, file $
-              , verbose=verbose, seed=seed
+              , verbose=verbose, seed=seed, dump=dump
 ;
 ;Inputs:
 ; star (string) - identifier for an intrinsic stellar spectrum, e.g. 'sun'
@@ -10,6 +10,9 @@ pro simobs_one, star, iod, elsf, ech, velsum, ston, file $
 ; ston (scalar) - continuum signal to noise [0 --> noiseless]
 ; file (string) - name of output file
 ; [seed=] - seed for random number generator (gives repeatable noise)
+; [dump=] - 0 or undefined: only write simulated observations to disk
+;           1: also write pixel level diagnostics for each order to disk
+;           2: also write supsampled pixel diagnostics to disk
 ;
 ;Output:
 ; Output file is created in the current working directory.
@@ -20,7 +23,7 @@ pro simobs_one, star, iod, elsf, ech, velsum, ston, file $
 ;Syntax
   if n_params() lt 7 then begin
     print, 'syntax: simobs_one, star, iod, elsf, ech, velsum, noise, file'
-    print, '                 [, seed=]'
+    print, '                 [, seed=, dump=]'
     print, "  e.g.: simobs_one, 'sun', 'keck-nso-52.5', 'jay2012', 'hires'" $
          + ", 27345.6, 0, 'sun.023'"
     return
@@ -233,14 +236,80 @@ pro simobs_one, star, iod, elsf, ech, velsum, ston, file $
    if keyword_set(ston) and max(ssim) gt 0 then begin
      denom = sqrt(ston^2.0 * ssim / max(ssim))
      sigma = 1.0 / denom
-     ssim += sigma * randomn(seed_exit, npix)
-   endif
+     noise = sigma * randomn(seed_exit, npix)
+     ssim += noise
+   endif else begin
+     noise = replicate(0.0, npix)
+   endelse
 
 ;
 ; Normalize Continuum of Current Order. Save into Full Array.
 ;
 
     spec[*,iord] = ssim * norm[*,iord]
+
+;Write auxilliary pixel data for current order to file.
+    file_aux = file + '.' + string(iord+1, '(i2.2)')
+    if keyword_set(dump) && dump ge 1 then begin
+      cmd = "simobs_one,'" + star + "','" + iod + "','" + elsf + "','" $
+          + ech + "'," + strtrim(string(velsum,'(f19.2)'),2) + "," $
+          + strtrim(ston,2) + ",'" + file + "'"
+;     if keyword_set(seed_entry) then cmd += ",seed=" + strtrim(seed_entry,2)
+      if keyword_set(dump) then cmd += ",dump=" + strtrim(dump,2)
+      rx = (dindgen(npix)-2010) / 1990d0
+      coef = reform(poly_fit(rx, w[jsim], 4, yfit=wfit, /doub))
+      if max(abs(1 - w[jsim]/wfit)) gt 1e-10 then begin
+        message, 'wavelengths are not quadratic'
+      endif
+      openw, u, file_aux, /get
+      printf, u, '# ' + cmd
+      printf, u, '#'
+      printf, u, '# oversampling: ' + strtrim(osamp,2) + ' points/pixel'
+      printf, u, '# input wavelengths: ' + file_wave
+      printf, u, '# pixel shift: ' + strtrim(pixsh,2) + ' pixels'
+      printf, u, '# iodine spectrum: ' + iod_param
+      printf, u, '# stelar spectrum: ' + file_star
+      printf, u, '# stellar velocity shift: ' + strtrim(velsum,2) + ' m/s'
+      printf, u, '# z+1: ' + strtrim(string(zplus1, form='(f20.11)'),2)
+      printf, u, '# effective LSF: ' + file_elsf
+      printf, u, '# signal/noise: ' + strtrim(ston,2)
+      printf, u, '# order normalization: ' + file_norm
+      printf, u, '#'
+      printf, u, '# waveleng = polyval(rx,coef)'
+      printf, u, '# rx = np.arange(-2010,2011) / 1990.0
+      printf, u, '# coef = [' $
+               + strjoin(strtrim(string(coef,'(g20.10)'),2),',') + ']'
+      printf, u, '# obs_spec = (temp*iod + noise) * norm_vec'
+      printf, u, '#'
+      printf, u, '# waveleng temp*iod     noise norm_vec obs_spec'
+      printf, u, '# -------- -------- --------- -------- --------'
+      for ipix=0, npix-1 do begin
+        j = jsim[ipix]
+        printf, u, form='(f10.5,f9.6,f10.6,2f9.2)' $
+              , w[j], ssim[ipix]-noise[ipix], noise[ipix] $
+              , norm[ipix,iord], spec[ipix,iord]
+      endfor
+      free_lun, u
+    endif else begin
+      if file_test(file_aux) then print,'WARNING - ' + file_aux + ' is stale'
+    endelse
+
+;Write auxilliary supersampled data for current order to file.
+    file_aux = file + '.' + string(iord+1, '(i2.2)') + 'x'
+    if keyword_set(dump) && dump ge 2 then begin
+      openw, u, file_aux, /get
+      printf, u, '# convolved = np.convolve(stellar*iodine, elsf)'
+      printf, u, '#'
+      printf, u, '# pixel wavelength stellar   iodine  star*iod convolved'
+      printf, u, '# ----- ---------- -------- -------- -------- --------'
+      for ix=0, nx-1 do begin
+        printf, u, form='(f7.2,f11.5,4f9.6)' $
+              , x[ix], w[ix], yiss[ix], yiod[ix], ycom[ix], y[ix]
+      endfor
+      free_lun, u
+    endif else begin
+      if file_test(file_aux) then print,'WARNING - ' + file_aux + ' is stale'
+    endelse
 
 ;Done looping through echelle orders
   endfor
@@ -282,7 +351,7 @@ pro simobs_one, star, iod, elsf, ech, velsum, ston, file $
   wdsk_simobs, head, file, /swap
 
 ;
-; Write Seeds to .dsk File
+; Write seeds to .dsk File
 ;
 
   if keyword_set(seed_entry) then begin

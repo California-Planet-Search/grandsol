@@ -1,5 +1,5 @@
 pro simobs_set, star, iod, elsf, ech, bcmax, rvk, vsys, ston, nobs $
-              , seed=seed
+              , seed=seed, dump=dump
 ;
 ;Inputs:
 ; star (string) - identifier for an intrinsic stellar spectrum, e.g. 'sun'
@@ -35,11 +35,12 @@ pro simobs_set, star, iod, elsf, ech, bcmax, rvk, vsys, ston, nobs $
 ;Internal constants
   c = 2.99792458d8					;m/s
 
-;Handle optional keyword.
+;Handle optional keywords.
   if keyword_set(seed) then begin
     seed_entry = seed
     seed_exit = seed
   endif
+  if ~keyword_set(dump) then dump=0
 
 ;;
 ;; Generate Velocities
@@ -86,7 +87,7 @@ pro simobs_set, star, iod, elsf, ech, bcmax, rvk, vsys, ston, nobs $
 
 ;Generate observations and associated files
     simobs_one, star, iod, elsf, ech, velsum[iobs], ston, file $
-              , seed=seed_exit
+              , seed=seed_exit, dump=dump
 
 ;Update observation list
     printf, unit, form='(i3.3,2x,a,i3,2f14.5)' $
