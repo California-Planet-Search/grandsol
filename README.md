@@ -20,6 +20,7 @@ Sample environment variables and aliases for tcsh:
 
 ```
   setenv GRAND /Users/valenti/git/grandsol
+  setenv GRAND_RAWDIR /mir3/raw
   setenv GRAND_REFDIR $GRAND/fref
   setenv GRAND_IREFDIR $GRAND/iref
   setenv GRAND_DATADIR /mir3/iodspec
