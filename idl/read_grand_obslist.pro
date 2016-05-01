@@ -63,9 +63,8 @@ pro read_grand_obslist, obli, obslist
     ipos2 = strpos(line, '"', ipos1+1)
     obsdir = strmid(line, ipos1+1, ipos2-ipos1-1)
     if ~file_test(obsdir) then begin
-      print, obslist + ' sets RJDIR|OBSDIR to nonexistent directory:'
-      print, '  ' + obsdir
-      return
+      print, 'Warning - nonexistent RJDIR: ' + obsdir
+ ;    return
     endif
   endif
 
