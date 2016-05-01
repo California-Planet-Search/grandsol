@@ -1,7 +1,44 @@
 ## IDL Procedures for the Grand Solution
 
+### Meteor file
 
-### Procedure calling syntax and docstrings
+##### Create a meteor file
+
+* Set ```GRAND_RAWDIR``` environment variable to point at the directory containing raw fits files.
+* Prepare an ```obslist``` file that specifies the set of observations to analyze with iGrand.
+* Run the IDL procedure ```meteor_obslist, 'obslist'``` to create a ```meteor``` file.
+* Add a ```METEOR meteor``` line to the header of the ```obslist``` file. 
+
+##### Dependencies
+
+The IDL procedure ```meteor_obslist``` requires several other IDL procedures: ```gaussbroad```, ```m_fndpks```, ```m_fords```, ```m_getarc```, ```meteor```, and ```read_grand_obslist```.
+
+##### Format of the meteor file
+
+| **Column** | **Description** | **Example** | **Variable** |
+| :---: | :--- | :--- | :--- |
+| **0** | Observation ID | `rj100.146` | `obsid` |
+| **1** | row where order 8 crosses column 2000 | `289.71` | `y7at2k` |
+| **2** | column where meteor crosses order 1 | `3032` | `meteor[0]` |
+| **3** | column where meteor crosses order 2 | `2936` | `meteor[1]` |
+| **4** | column where meteor crosses order 3 | `2837` | `meteor[2]` |
+| **5** | column where meteor crosses order 4 | `2737` | `meteor[3]` |
+| **6** | column where meteor crosses order 5 | `2635` | `meteor[4]` |
+| **7** | column where meteor crosses order 6 | `2531` | `meteor[5]` |
+| **8** | column where meteor crosses order 7 | `2424` | `meteor[6]` |
+| **9** | column where meteor crosses order 8 | `2315` | `meteor[7]` |
+| **10** | column where meteor crosses order 9 | `2204` | `meteor[8]` |
+| **11** | column where meteor crosses order 10 | `2089` | `meteor[9]` |
+| **12** | column where meteor crosses order 11 | `1972` | `meteor[10]` |
+| **13** | column where meteor crosses order 12 | `1853` | `meteor[11]` |
+| **14** | column where meteor crosses order 13 | `1730` | `meteor[12]` |
+| **15** | column where meteor crosses order 14 | `1604` | `meteor[13]` |
+| **16** | column where meteor crosses order 15 | `1474` | `meteor[14]` |
+| **17** | column where meteor crosses order 16 | `1341` | `meteor[15]` |
+| **18** | median amplitude of measured meteor features [DN] | `72.1` | `zmed` |
+| **19** | median of absolute value of residual of meteor location fit [pixels] | `0.403` | `mar` |
+
+### IDL procedure calling syntax and docstrings
 ##### fmtnum.pro
 ```
 function fmtnum, data, fmt
@@ -42,6 +79,21 @@ pro locate_interval, x, xbeg, xend, ibeg, iend, nadd=nadd, stop=stop
 ; 2008-Sep-15 Valenti  Initial coding.
 ```
 
+##### meteor_obslist.pro
+```
+pro meteor_obslist, oblist_file, print=print, plot=plot
+;Create a 'meteor' file in current working directory.
+;
+;Inputs:
+; GRAND_RAWDIR (environment variable) directory containing raw fits files
+; obslist_file (string) name of an obslist file containing a list of obsids
+; [/print] (switch) print results to terminal as well as the meteor file
+; [/plot] (switch) create cool diagnostic plot in terminal window
+;
+;Output:
+; 'meteor' (disk file in current working directory) location of meteor
+;   feature for each order in each observation in 'obslist' file.
+```
 
 ##### rdnso.pro
 ```
