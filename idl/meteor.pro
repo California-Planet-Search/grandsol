@@ -43,7 +43,7 @@ pro meteor, obsid, meteor, zmed, mar, y7at2k $
 ;read data form fits file
   file = rawdir + run + string(obsnum, form='(i4.4)') + '.fits'
   if ~file_test(file) then begin
-    message, obsnum + 'has no raw image: ' + file
+    message, obsid + 'has no raw image: ' + file
   endif
   im = mrdfits(file, 2, hd2, /dscale, /silent)
   im = rotate(temporary(im), 3)
