@@ -238,3 +238,19 @@ def read_grlsf(lsffile):
 
     return df
 
+def read_truth(tfile):
+    """
+    Read an input "truth" file from a simulated dataset.
+
+    Args:
+        wlsfile (string): input file name, (e.g. sun.034.02)
+
+    Returns:
+        DataFrame: input data contained within `wlsfile` represented as a Pandas DataFrame
+
+    """
+
+    df = pd.read_csv(tfile, sep=' ', skipinitialspace=True, comment='#', names=['waveleng', 'temp*iod', 'noise', 'norm_vec', 'obs_spec'])
+
+    return df 
+

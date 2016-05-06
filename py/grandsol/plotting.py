@@ -683,3 +683,51 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
     pl.suptitle('%s: order: %d, observation index: %d' % (runname, order, iobs))
 
     return pl.gcf()
+
+
+def compare_wls_byorder(runname, obdf, orders=[2,3,4,5,6,7,8,9,10]):
+    """
+
+    Plot the input "truth" wavelength solution for all observations and orders from a single ``iGrand`` iteration.
+
+    Args:
+        runname (string): name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
+        obdf (DataFrame): observation list data frame as output by ``grandsol.io.read_obslist``
+        orders (list): list of orders to combine to derive the RVs for each iteration
+
+    Returns:
+        A multi-page PDF file named `runname`_wls_byorder.pdf
+
+    """
+    
+    obdf.set_index('ind', inplace=True)
+    
+    colors = [ cmap(x) for x in np.linspace(0.05, 0.95, len(obdf.index))]
+
+    with PdfPages('%s_wls_byorder.pdf' % (runname)) as pdf:
+        for o in orders:
+            fig = pl.figure(figsize=default_size)
+
+            gout = grandsol.io.read_modfile('%s.%02d.99.mod' % (runname,o))
+            for ind in obdf.index:
+                obname = obdf.loc[ind, 'obs']
+                
+                truthfile = "../../%s.%02d" % (obname, o)
+                tdf = grandsol.io.read_truth(truthfile)
+
+                
+
+                diff = gout[gout['ind'] == ind]['wav_obs'].values - tdf['waveleng'].values
+
+                pl.plot(tdf['waveleng'], diff, '-', lw=1, color=colors[ind-1])
+                pl.xlim(min(tdf['waveleng']), max(tdf['waveleng']))
+
+                pl.xlabel('input wavelength [$\\AA$]')
+                pl.ylabel('output - input wavelength [$\\AA$]')
+                pl.title('%s, order: %02d' % (runname,o))
+
+            pdf.savefig()
+            pl.close()
+
+    
+    
