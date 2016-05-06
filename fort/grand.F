@@ -1,7 +1,25 @@
 
+c
+c below 
+c ---> _LSFINTERP_ = 1 means to use the old way of 
+c                      splining in between the k=9 nodes
+c ---> _LSFINTERP_ = 2 means to use the new way of 
+c                      linearly interpolating between 
+c                      the k=9nodes
+c 
+#define _LSFINTERP_ 2
+
+
 c-----------------------------------------------------------------------
 c
-c Mar 14, 2016, Jay
+c May  5, 2016 --- Jay
+c
+c * work on wavelength specification to go from ABCDE to 9-point
+c * turn the lsf interpolation scheme into a linear thing... 
+c
+c-----------------------------------------------------------------------
+c
+c Mar 14, 2016 --- Jay
 c
 c * I have fixed some bugs that have mostly do with with print-outs
 c   of diagnostic items when the items don't get initialized properly.
@@ -352,6 +370,7 @@ c
       real*4,    dimension(:,:,:), allocatable :: pix_imn
       real*4,    dimension(:,:,:), allocatable :: mod_imn
       real*8,    dimension(:,:,:), allocatable :: wav_imn
+      real*8,    dimension(:,:,:), allocatable :: wav_kmn
       real*4,    dimension(:,:,:), allocatable :: tem_imn
       real*4,    dimension(:,:,:), allocatable :: rat_imn
       real*4,    dimension(:,:,:), allocatable :: bar_imn
@@ -435,6 +454,10 @@ c
      .           2.40, 2.50, 2.65, 2.80, 3.00/
  
       integer gopt, dopt, sopt
+      real    emin
+
+      integer BAD, BADs
+      integer bad_list(_NDIM_)
  
       integer NNIT, NTEM
       integer  NIT
@@ -445,8 +468,7 @@ c--------------------------------------------
 c
 c just a summary of fits that were made
 c
-      real    coeffw(5), scoeffw
-      real    coeffwx(5)
+      real    coeffw(9), scoeffw
       real    coeffg(_RATN_)
  
       integer p
@@ -548,6 +570,11 @@ c
       integer NARG, NARGs
       character*80 LOGFILE
 
+      real*8 rk
+      real*8 dspline
+      real*8 dspline3
+
+      real*8 wav_i(_IDIM_)
 
 
 c------------------------------------------------------------------------------
@@ -655,6 +682,7 @@ c
       allocate(pix_imn(_IDIM_,_MDIM_,Ns))
       allocate(mod_imn(_IDIM_,_MDIM_,Ns))
       allocate(wav_imn(_IDIM_,_MDIM_,Ns))
+      allocate(wav_kmn(_KDIM_,_MDIM_,Ns))
       allocate(tem_imn(_IDIM_,_MDIM_,Ns))
       allocate(rat_imn(_IDIM_,_MDIM_,Ns))
       allocate(bar_imn(_IDIM_,_MDIM_,Ns))
@@ -835,7 +863,15 @@ c-------------------------------------------------------
 c
 c initial set-up
 c
-      do n = 1, _NDIM_
+      write(6,'('' '')')
+      write(6,'(''initial setup... '')')
+      write(6,'(''        NDIM = '',i5)') _NDIM_ 
+      write(6,'(''          Ns = '',i5)')  Ns
+      write(6,'(''        MDIM = '',i5)') _MDIM_ 
+      write(6,'(''        IDIM = '',i5)') _IDIM_ 
+      write(6,'('' '')')
+      do n = 1, Ns
+         print*,'n = ',n
          unim(n) = .false.
          zn(n) = 0.0
          zbarn(n) = 0.000d0
@@ -871,6 +907,7 @@ c
 c if we're not starting from scratch, then
 c read in the data from the previous iteration
 c
+      write(6,*) 'NIT = ',NIT
       if (NIT.ne.0) then
          write(6,*) 'Not from scratch...'
          call read_mod(pix_imn,mod_imn,wav_imn,
@@ -912,12 +949,29 @@ c
 c NIT=0... start from scratch...
 c
       write(6,*) ' '
+      write(6,*) 'call read_raw...'
 
  
       call read_raw(RJSOURCE,
      .              pix_imn,rat_imn,tem_imn,
      .              rej_imn,met_imn,
      .              wav_imn,unim,z0,Ns,MMIN,MMAX)
+
+      write(6,*) 
+      write(6,*) 'call wavi2wavk...'
+
+      do N = 1, Ns 
+         do M = MMIN, MMAX
+            call wavi2wavk(wav_imn(1,M,N),wav_kmn(1,M,N))
+            call wavk2wavi(wav_kmn(1,M,N),wav_i)
+c           do i = 1, _IDIM_
+c              write(18,118) N,M,I,rk,wav_imn(I,M,N),wav_i(I),
+c    .                       wav_imn(I,M,N)-wav_i(I)
+c118           format(1x,i5.5,1x,i2.2,1x,i4.4,1x,f8.5,
+c    .                5x,8f16.9)
+c              enddo
+            enddo!M
+         enddo!N
 
       do n = 1, Ns
          zn(n) = z0(n)
@@ -937,6 +991,12 @@ c
 c initial iteration, find the rough model template + LSF
 c that describes the data
 c
+
+      BADs = 0
+      open(15,file='LOG.INITMOD.OUT',status='unknown')
+      open(16,file='LOG.INITWLX.OUT',status='unknown')
+      write(FILENAME,'(''LOG.WAVKOUT.M'',i2.2)') MMIN
+      open(17,file=FILENAME,status='unknown')
       do n = 1, Ns
          if (.not.unim(n)) goto 445
          do m = MMIN, MMAX
@@ -944,11 +1004,24 @@ c
          write(6,*) 'call find_initmod...'
  
          call find_initmod(pix_imn(1,m,n),
-     .                     wav_imn(1,m,n),gopt,dopt,sopt,m)
+     .                     wav_imn(1,m,n),gopt,dopt,sopt,m,emin)
  
          write(6,*)
-         write(6,*) 'INITMOD: ',n,m,gopt,dopt,sopt
+         write(15,95) n,m,gopt,dopt,sopt,emin
+   95    format(1x,i3,1x,i2,1x,i5,1x,i5,1x,i5,1x,f14.3)
+         write( 6,97) n,m,gopt,dopt,sopt
+   97    format('INITMOD:  n=',i3,' m=',i2,
+     .                   ' g=',i2,' d=',i4,' s=',i4)
          write(6,*)
+         write(6,98) (k,k=1,9), (k,k=1,9)
+   98    format('   ',2x,' ',3x,' ',2x,' ',2x,1x,2x,1x,
+     .                      2x,09(3x,i1,3x),
+     .                      2x,09(4x,i1,2x))
+
+         if (gopt.eq.43) then
+             BADs = BADs + 1
+             bad_list(BADs) = n
+             endif
  
          do i = 0001, 4021
             gsn_im(i,m)    = gopt
@@ -967,7 +1040,7 @@ c
      .                  mod_imn(1,m,n),
      .                  rat_imn(1,m,n))
  
- 
+
  
 c------------------------------------------------------------
 c
@@ -980,17 +1053,25 @@ c too discordant.  This is done each time, so that if a
 c point is removed, it can be redeemed.
 c
          done = .false.
-         do NNIT = 1, 15
+         do NNIT = 1, 99
 
-            call tweak_wls(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                     wav_imn(1,m,n),rat_imn(1,m,n),
-     .                     tem_imn(1,m,n),
-     .                     lsfjim(1,1,m),coeffw)
-            call polyfit_w(wav_imn(1,m,n),
-     .                     wav_imn(1,m,n),AA,BB,CC,DD,EE)
+            if (NNIT.gt.10) then
+                  call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                            wav_imn(1,m,n),rat_imn(1,m,n),
+     .                            tem_imn(1,m,n),
+     .                            lsfjim(1,1,m),coeffw)
+               else
+                  call tweak_wls1(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                            wav_imn(1,m,n),rat_imn(1,m,n),
+     .                            tem_imn(1,m,n),
+     .                            lsfjim(1,1,m),coeffw)
+                  call polyfit_w(wav_imn(1,m,n),
+     .                           wav_imn(1,m,n),AA,BB,CC,DD,EE)
+               endif
+
             call find_ftso(ftso,wav_imn(1,m,n))
- 
-            if (NNIT.le.22) then
+  
+            if (NNIT.le.20) then
                call tweak_gsn(pix_imn(1,m,n),rej_imn(1,m,n),
      .                        wav_imn(1,m,n),rat_imn(1,m,n),
      .                        gsn_im(1,m),lsfjim(1,1,m),coeffg)
@@ -1006,18 +1087,21 @@ c
             nrej = find_locrej(pix_imn(1,m,n),mod_imn(1,m,n),
      .                         rej_imn(1,m,n),sigi)
  
-            write(6,444) 0,n,m,NNIT,nrej,(coeffw(p),p=1,5),
+            write(6,444) 0,n,m,NNIT,nrej,(coeffw(p),p=1,9),
      .                                   (lsfqkmn(7,k,m,n),k=1,_KDIM_)
+            if (NNIT.eq.50)
+     .      write(16,444) 0,n,m,NNIT,nrej,(coeffw(p),p=1,9),
+     .                                    (lsfqkmn(7,k,m,n),k=1,_KDIM_)
  
-  444       format('NIT',i2.2,':',i3.3,'.',i2.2,'_',i2.2,3x,i4,1x,
-     .                         3x,05(f6.3,1x),
-     .                         5x,99(f7.5,1x))
+  444       format('NIT',i2.2,':',i3.3,'.',i2.2,'_',i2.2,1x,i2,1x,
+     .                         3x,09(f6.3,1x),
+     .                         3x,09(f6.3,1x))
             scoeffw = 0.
             do p = 1, 5
                scoeffw = scoeffw + abs(coeffw(p))
                enddo
-            if (scoeffw.lt.0.025.and.done) goto 443
-            if (NNIT.ge.3..and.scoeffw.lt.0.025) done = .true.
+c            if (scoeffw.lt.0.025.and.done) goto 443
+c           if (NNIT.ge.3..and.scoeffw.lt.0.025) done = .true.
             enddo!NNIT
  443        continue
  
@@ -1082,10 +1166,56 @@ c
                   enddo
                enddo
             endif
- 
+
+         do m = MMIN, MMAX
+            call wavi2wavk(wav_imn(1,m,n),wav_kmn(1,m,n))
+            write(17,117) n,m,(wav_kmn(k,m,n),k=1,9)
+  117       format(1x,i4.4,1x,i2.2,1x,9(1x,f13.7))
+            if (.false.) then
+                call wavi2wavk(wav_imn(1,M,N),wav_kmn(1,M,N))
+                call wavk2wavi(wav_kmn(1,M,N),wav_i)
+                do i = 1, _IDIM_
+                   write(18,118) N,M,I,wav_imn(I,M,N),wav_i(I),
+     .                                 wav_imn(I,M,N)-wav_i(I)
+ 118               format(1x,i5.5,1x,i2.2,1x,i4.4,5x,3f16.9)
+                   enddo
+                endif
+            enddo
   445    continue! not unim
          enddo!n
+         close(15)
+         close(16)
+         close(17)
 
+         if (BADs.ne.0) then
+             write(6,*) ' '
+             write(6,*) 'There were serious problems with the following'
+             write(6,*) 'observations.  Perhaps they are templates?'
+             write(6,*) ' '
+             do BAD = 1, BADs
+                write(6,'(i4,1x,i4)') BAD, bad_list(BAD)
+                enddo
+             write(6,*) ' '
+             open(91,file=RJSOURCE,status='unknown')
+    3        read(91,'(80a)',end=4) STRING
+             if (STRING(1:1).ge.'0'.and.STRING(1:1).le.'9') then
+                read(STRING,*) N,FILENAME
+                do BAD = 1, BADs
+                   if (n.eq.bad_list(BAD)) write(*,*) STRING
+                   enddo
+                endif
+             goto 3
+    4        close(91)
+             write(6,*) ' '
+             write(6,*) 'Cannot continue.'
+             write(6,*) ' '
+             stop
+             endif
+
+c     if (.true.) STOP
+
+
+     
 c--------------------------------------------------------
 c
 c combine all the velocity-shifted template observations
@@ -1147,6 +1277,7 @@ c
       write(6,'(''*****                    '')')
       write(6,'(''*********************************************'')')
       write(6,'('' '')')
+
  
       do s = 0001, _SDIM_
          tem0(s) = tems(s)
@@ -2181,6 +2312,53 @@ c
  
  
  
+
+c=======================================================================
+c
+c This function will return the spline value at location rx in the array
+c    yp(1:Ns); the routine uses rspline_fp() which gives the projection
+c    of the spline nodes on point at location rx
+c
+      real*8 function dspline(rx,yp,Ns)
+      implicit none
+ 
+      integer Ns                 ! INPUT: the number of elements in y()
+      real*8 rx                  ! INPUT: the location within the y array
+      real*8 yp(Ns)              ! INPUT: the y array
+ 
+      integer ic                 ! the smallest possible array location
+      real fp6(6)                ! the maximum number of contributing elements
+      integer ip                 !
+      integer ip1, ip2           ! the range of relevant elements
+ 
+      ic = int(rx)-2
+      if (ic.lt.   1) ic = 1
+      if (ic.gt.Ns-5) ic = Ns-5
+ 
+c
+c This routine will determine the how each of the nodes in the spline
+c will contribute to the value of the spline at location rx.  At most,
+c 6 can contribute, in that we fit a 5-point quartic to each pixel for
+c its value/slope and we use these two quantities between two pixels.
+c All the subtraction and array bounds below are designed to allow me
+c to just use local variables here and not to have to generate a whole
+c new array with dimension Ns.
+c
+      call rspline_fp(1+rx-ic,6,fp6(1),ip1,ip2)
+ 
+c
+c Now, just add up the contributions to the value of
+c the spline at location rx.
+c
+      dspline = 0.
+      do ip = ip1, ip2
+         dspline = dspline + fp6(ip)*yp(ip+ic-1)
+         enddo
+ 
+      return
+      end
+ 
+
 c=======================================================================
 c
 c This function will return the spline value at location rx in the array
@@ -2391,6 +2569,51 @@ c
          return
          endif
  
+      end
+
+
+
+c==============================================================================
+c
+c this is the linear-interpolation equivalent of rspline; at the ends, it
+c doesn't extrapolate, it just uses the end value
+c
+c
+      subroutine rinterp_fp(rx,Ns,fp,ip1,ip2)
+      implicit none
+ 
+      real*8  rx          ! INPUT:  location at which spline is to be eval
+      integer Ns          ! INPUT:  number of nodes in spline
+      real    fp(Ns)      ! OUTPUT: contribution of each node to spline val
+      integer ip1, ip2    ! OUTPUT: the range over which nodes contribute
+ 
+      integer ix
+      real    fx
+      integer i,ip
+
+      if (rx.le.1) then
+          fp(1) = 1.0
+          ip1 = 1
+          ip2 = 1
+          return
+          endif
+
+      if (rx.ge.Ns) then
+          fp(Ns) = 1.0
+          ip1 = Ns
+          ip2 = Ns
+          return
+          endif
+
+      ix = int(rx)
+      fx = rx-ix
+
+      ip1 = ix 
+      ip2 = ix+1
+      fp(ip1) = (1-fx)
+      fp(ip2) =  fx
+
+      return
       end
  
  
@@ -3314,7 +3537,10 @@ c
             do k = 1, _KDIM_
                proji_k(k) = 0.0
                enddo
-            call rspline_fp(rk,_WAVN_,proji_k,k1_i(i),k2_i(i))
+            if (_LSFINTERP_.eq.1) 
+     .          call rspline_fp(rk,_WAVN_,proji_k,k1_i(i),k2_i(i))
+            if (_LSFINTERP_.eq.2) 
+     .          call rinterp_fp(rk,_WAVN_,proji_k,k1_i(i),k2_i(i))
             do q = 0001, _QDIM_
             do k = 0001, _KDIM_
                a_iqk(i,q,k) = 0.
@@ -3542,7 +3768,10 @@ c      if (unuse) goto 1
      .                         (_WAVY_-_WAVB_)
          if (rk.lt. 0001 ) rk = 1.
          if (rk.gt._WAVN_) rk = _WAVN_
-         call rspline_fp(rk,_WAVN_,projk,k1,k2)
+         if (_LSFINTERP_.eq.1) 
+     .       call rspline_fp(rk,_WAVN_,projk,k1,k2)
+         if (_LSFINTERP_.eq.2) 
+     .       call rinterp_fp(rk,_WAVN_,projk,k1,k2)
          do q = 1, _QDIM_
             lsfq(q) = 0.
             do k = k1, k2
@@ -3723,7 +3952,7 @@ c
 c------------------------------------------------------
  
  
-      subroutine find_initmod(pixi,wavi,gopt,dopt,sopt,m)
+      subroutine find_initmod(pixi,wavi,gopt,dopt,sopt,m,emin)
       implicit none
  
       real   pixi(4021)
@@ -3780,7 +4009,7 @@ c need the offset/slope to 0.3 pixel.... for now.  This will
 c be improved in the next stage.  We just need to get close
 c enough to find the minimum with least squares.
 c
-      do g =   03,  23, 05
+      do g =   03,  43, 05
          do o = 00001, 40401
             modo(o) = 0.
             do oo = max(00001,o-100), min(40401,o+100)
@@ -4628,7 +4857,10 @@ c
          projk(k) = 0.0
          enddo
  
-      call rspline_fp(rk,_WAVN_,projk,k1,k2)
+      if (_LSFINTERP_.eq.1) 
+     .    call rspline_fp(rk,_WAVN_,projk,k1,k2)
+      if (_LSFINTERP_.eq.2) 
+     .    call rinterp_fp(rk,_WAVN_,projk,k1,k2)
  
       do q = 1, _QDIM_
          lsfq(q) = 0.
@@ -4682,7 +4914,8 @@ c
             projk(k) = 0.0
             enddo
  
-         call rspline_fp(rk,_WAVN_,projk,k1,k2)
+         if (_LSFINTERP_.eq.1) call rspline_fp(rk,_WAVN_,projk,k1,k2)
+         if (_LSFINTERP_.eq.2) call rinterp_fp(rk,_WAVN_,projk,k1,k2)
  
          do q = 1, _QDIM_
             lsfq(q) = 0.
@@ -6370,7 +6603,7 @@ c
 c
 c-----------------------------------------------
  
-      subroutine tweak_wls(pixi,reji,wavi,nrmi,temi,lsfji,coeffw)
+      subroutine tweak_wls2(pixi,reji,wavi,nrmi,temi,lsfji,coeffw)
       implicit none
  
       real   pixi(_IDIM_)
@@ -6379,7 +6612,177 @@ c-----------------------------------------------
       real   nrmi(_IDIM_)
       real   temi(_IDIM_)
       real   lsfji(_JDIM_,_IDIM_)
-      real   coeffw(5)
+      real   coeffw(9)
+ 
+      real   modo(_ODIM_)
+      real   fxto(_ODIM_)
+ 
+      real*8 wavk(_KDIM_)
+      real*8 wavh(_IDIM_)
+ 
+      real   modx(_IDIM_)
+      real   modi(_IDIM_)
+      real   modl(_IDIM_), modlu
+      integer o
+      real    t, f, ftsw
+      integer ii, j, i, ic
+      real*8  w
+      real    msuma
+      real    msumb
+      real    projn_i(5,_IDIM_)
+      real*8  rn
+      integer n, n1, n2
+      integer    ni, nj
+      integer    i1, i2
+      real nrm
+ 
+      real*8  normal(5,5)
+      real*8  lamron(5,5)
+      real*8  vector(5)
+      real*8  coeffs(5)
+
+      real*8  asum, bsum
+      real*8  di_k(9)
+      integer k, k1, k2
+      real*8  d, dbar, dsum
+
+      real*8 rk
+      real*8 ri, di
+      real*8 wav0_i(_IDIM_)
+      real*8 dspline3
+      integer NIT
+      common/NIT_/NIT
+      data   NIT/0/
+
+      real*8 diff_i(_IDIM_)
+      real*8 diff_u(_IDIM_)
+      integer NNIT
+
+      NIT = NIT + 1
+
+
+      do k = 01, 09
+         coeffw(k) = 0.
+         enddo
+
+  333 continue
+
+      do NNIT = 01, 01
+
+      do i = 0001, _IDIM_
+         wav0_i(i) = wavi(i)
+         enddo
+ 
+      do o = 00001, _ODIM_
+         ri = 1 + (o-101)*0.1
+         ii = int(ri)
+         if (ii.lt._IBEG_) ii = _IBEG_
+         if (ii.gt._IEND_) ii = _IEND_
+         w   = wavi(ii) + (ri-ii)*(wavi(ii+1)-wavi(ii))
+         t   = temi(ii) + (ri-ii)*(temi(ii+1)-temi(ii))
+         nrm = nrmi(ii) + (ri-ii)*(nrmi(ii+1)-nrmi(ii))
+         f = ftsw(w)
+         fxto(o) = f*t*nrm
+         enddo
+ 
+      do o = 00001, _ODIM_
+         i = 1 + (o-101)*0.1
+         if (i.le._IBEG_) i = _IBEG_
+         if (i.ge._IEND_) i = _IEND_
+         modo(o) = 0.
+         do j = -100, 100
+            if (o+j.gt.00001.and.o+j.lt._ODIM_)
+     .      modo(o) = modo(o) + fxto(o+j)*lsfji(101+j,i)
+            enddo
+         enddo
+
+      do i = 0001, _IDIM_
+         o = 101 + (i-1)*10
+         modx(i) = (modo(o+1) - modo(o-1))/2
+         modi(i) = modo(o)
+         enddo
+
+      do i = 0001, _IDIM_
+         rn = 1 + 4.*(i-_RATB_)/(_RATY_-_RATB_)
+         call rspline_fp(rn,5,projn_i(1,i),n1,n2)
+         enddo
+
+      dsum = 0.
+      do i = _RATB_, _RATY_
+         diff_i(i) = pixi(i)-modi(i)
+         dsum = dsum + abs(diff_i(i))
+         enddo
+      dbar = dsum/(_RATY_-_RATB_+1)
+
+      do i = 0001, _IDIM_
+         diff_u(i) = diff_i(i)
+         if (diff_u(i).gt. 2.0*dbar) diff_u(i) =  2.0*dbar
+         if (diff_u(i).lt.-2.0*dbar) diff_u(i) = -2.0*dbar
+         enddo
+
+      do k = 1, 9
+         k1 = max(1,k-1)
+         k2 = min(9,k+1)
+         i1 = _RATB_ + (k1-1.00)*(_RATY_-_RATB_)/8.00
+         i2 = _RATB_ + (k2-1.00)*(_RATY_-_RATB_)/8.00
+         asum = 0.
+         bsum = 0.
+         do i = i1, i2
+            if (reji(i).eq.0) then
+               asum = asum + modx(i)*diff_u(i)
+               bsum = bsum + modx(i)*modx(i)
+               endif
+            enddo
+         di_k(k) = asum/bsum
+         coeffw(k) = coeffw(k) + di_k(k)
+         enddo
+
+c     write( *,191) (di_k(k),k=1,9)
+c     write(91,191) (di_k(k),k=1,9)
+  191 format(1x,5x,9f10.5)
+
+      do i = 0001, _IDIM_
+         rk = 1 + (_WAVN_-1.0)*
+     .            (  i   -_WAVB_)/
+     .            (_WAVY_-_WAVB_)
+         di = dspline3(rk,di_k,9) 
+         ri = i + di*0.10
+         wavi(i) = dspline3(ri,wav0_i,4021)
+c         if (NNIT.eq.10)
+c     .   write(19,119) NIT,i,wav0_i(i),wavi(i),
+c     .                     dspline3(ri,wav0_i,4021),rk,di,ri,reji(i),
+c     .                     diff_i(i), modx(i), diff_u(i)
+c  119    format(i2,1x,i4.4,1x,f14.7,1x,f14.7,
+c     .                     1x,f14.7,1x,f8.4,1x,f8.4,1x,f9.4,1x,i1,
+c     .                     1x,f12.3,1x,f12.3,1x,f12.3)
+         enddo 
+
+      enddo!NNIT
+
+c     call wavi2wavk(wavi,wavk)
+c     call wavk2wavi(wavk,wavi)
+
+      return
+      end
+ 
+ 
+c-----------------------------------------------
+c
+c
+c
+c
+c-----------------------------------------------
+ 
+      subroutine tweak_wls1(pixi,reji,wavi,nrmi,temi,lsfji,coeffw)
+      implicit none
+ 
+      real   pixi(_IDIM_)
+      integer*1 reji(_IDIM_)
+      real*8 wavi(_IDIM_)
+      real   nrmi(_IDIM_)
+      real   temi(_IDIM_)
+      real   lsfji(_JDIM_,_IDIM_)
+      real   coeffw(9)
  
       real   modo(_ODIM_)
       real   fxto(_ODIM_)
@@ -6500,8 +6903,12 @@ c-----------------------------------------------
          wavi(i) = wavh(i)
          enddo
  
+      do n = 1, 9
+         coeffw(n) = 0.
+         enddo
+
       do n = 1, 5
-         coeffw(n) = coeffs(n)
+         coeffw(1+2*(n-1)) = coeffs(n) 
          enddo
  
       return
@@ -13240,4 +13647,65 @@ c
       return
       end
  
+
+
+
+c-----------------------------------------
+c
+c
+      subroutine wavi2wavk(wav_i,wav_k)
+      implicit none
+
+      real*8 wav_i(_IDIM_) 
+      real*8 wav_k(_KDIM_) 
+      
+      integer k 
+      real*8  ri
+      integer ii
+      real*8  fi
+      real*8  dspline
+      real*8  dspline3
+      real*8  a, b, c
+
+      do k = 1, _KDIM_
+         ri = _WAVB_ + (k-1.0d0)*(_WAVY_-_WAVB_)/(_WAVN_-1)
+         ii = int(ri)
+         fi = ri-ii
+         a = wav_i(ii) + fi*(wav_i(ii+1)-wav_i(ii))         
+         b = dspline(ri,wav_i,4021)
+         c = dspline3(ri,wav_i,4021)
+c        write(*,119) k,a,b,c,a-b,a-c
+c119     format(1x,i2,1x,8f15.8)
+         wav_k(k) = c
+         enddo
+
+      return
+      end
+
+
+
+c-----------------------------------------
+c
+c
+      subroutine wavk2wavi(wav_k,wav_i)
+      implicit none
+
+      real*8 wav_k(_KDIM_) 
+      real*8 wav_i(_IDIM_)
+
+      integer i
+      real*8  rk
+      real*8  dspline3
  
+      do i = 1, _IDIM_
+         rk = 1 + (_WAVN_-1.0)*
+     .            (  i   -_WAVB_)/
+     .            (_WAVY_-_WAVB_)
+         wav_i(i) = dspline3(rk,wav_k,_KDIM_)
+         enddo
+
+      return
+      end
+
+#include "dspline3.f"
+
