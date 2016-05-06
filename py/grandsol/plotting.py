@@ -11,7 +11,7 @@ import os
 import subprocess
 import grandsol
 
-default_size = (14,10)
+default_size = (15,10)
 cmap = cm.jet
 
 

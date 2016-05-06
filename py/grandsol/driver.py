@@ -138,9 +138,11 @@ def run_iterations(opt, ppserver=None):
 
         grandsol.plotting.velplot_by_order(runname, obdf, runorders, outfile='iGrand_%s_velbyord.pdf' % opt.star)
         grandsol.plotting.velplot_by_order(runname, obdf, runorders, outfile='iGrand_%s_bcbyord.pdf' % opt.star, vsbc=True)
-            
+
+        if opt.truth:
+            grandsol.plotting.compare_wls_byorder(runname, obdf, runorders)
+
         iterdone.append(n)
-        
         os.chdir(rundir)
         
         if len(joblist) > 0 or n == opt.niter:
