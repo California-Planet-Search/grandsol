@@ -22,6 +22,7 @@ def args():
                         default=None, type=str)
     parser.add_argument('-o', '--overwrite', dest='overwrite',action='store_true',help='Overwrite previous run [False]',default=False)
     parser.add_argument('--nofudge', dest='nofudge',action='store_true',help='Do not apply the fudge [False]',default=False)
+    parser.add_argument('--meteor', dest='meteor',action='store',help='Path to meteor file [None]',default=None)
     parser.add_argument('--orders',dest='orders',action='store',help='List of spectral orders to analyze. [2,3,4,5,6,7,8,9,10]',default=[2,3,4,5,6,7,8,9,10])
     parser.add_argument('--local', dest='local',action='store_true',help='Run on local computer only. [True]',default=True)
     parser.add_argument('--ncpus',dest='ncpus',action='store',help='Number of local CPUs to utilize. [autodetect]',default='autodetect')

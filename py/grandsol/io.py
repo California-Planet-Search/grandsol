@@ -52,7 +52,7 @@ def read_obslist(infile):
         
     return odf
 
-def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, overwrite=False):
+def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=False, overwrite=False):
     """
     Write list of observations in the format that ``grand`` likes.
 
@@ -61,6 +61,7 @@ def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, overwrite=F
         sysvel (float): Systemic radial velocity of the system in m/s
         outfile (string): (optional) name of output observation list
         vorb (float scalar or array): (optional) initial velocity guess for each observation
+        meteor (bool): Add meteor line to obslist?
         overwrite (bool): (optional) overwrite if outfile already exists?
         
     Returns:
@@ -78,6 +79,8 @@ def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, overwrite=F
     odf['ind'] = odf.index.values + 1
     
     header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\n' % (sysvel, datadir)
+    if meteor:
+        header += "METEOR meteor\n" 
     body = odf.to_string(index=False, header=False,
                          columns=['ind', 'obs','fill', 'bc', 'vorb'],
                          formatters=['{:03d}'.format, '{:s}'.format, '{:d}'.format, '{:.5f}'.format, '{:.5f}'.format])
@@ -175,7 +178,9 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False, get_
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])
 
+    obdf.ind = np.array(obdf.ind.values, dtype=int)
     mdf = pd.merge(vdf, obdf, left_index=True, right_on='ind')
+    
 
     if varr_byorder: return (mdf, relvel.vel)
     elif get_weights: return weight_matrix

@@ -9,9 +9,13 @@ pro plot_jump_phase, imsum
   endif
 
 ;internal parameters.
-  per = 1024 / 15.0
-  dx = 39.37
-  xr = [-4, 4]
+  ;per = 1024 / 15.0
+  ;dx = 39.37
+  per = 1024.0
+  dx = 654.
+
+  xr = [-6, 6]
+  yr = [0.985, 1.03]
 
 ;remove all but the smallest scale features
   y = imsum / median(imsum, 7)
@@ -24,8 +28,8 @@ pro plot_jump_phase, imsum
   if nwhr gt 0 then dpix[iwhr] -= per
 
 ;construct median response per phased pixel
-  nmed = xr[1] - xr[0]
-  xmed = xr[0] + findgen(nmed) + 0.5
+  nmed = xr[1] - xr[0] + 1
+  xmed = xr[0] + findgen(nmed); + 0.5
   ymed = fltarr(nmed)
   for imed=0, nmed-1 do begin
     cen = xmed[imed]
@@ -35,11 +39,11 @@ pro plot_jump_phase, imsum
 
 ;calculate mean of medians
   ymedsum = total(ymed) / nmed
+;  ymedsum = 1.0
 
 ;plot parameters
   thi = 5
   chars = 1.8
-  yr = [0.985, 1.01]
   xtit = '(Column - ' $
        + strtrim(string(dx, form='(f9.2)'), 2) $
        + ') mod ' $
@@ -70,7 +74,7 @@ pro plot_jump_phase, imsum
 
 ;plot data
 ; oplot, xcr, [1,1], thi=thi, co=c24(2)
-  oplot, xcr, ymedsum+[0,0], thi=thi, lin=2, co=c24(10)
+  oplot, xcr, 1.0+[0,0], thi=thi, lin=2, co=c24(10)
   oplot, [0,0], !y.crange, thi=thi, co=c24(4)
   oplot, dpix, y, ps=7, thi=thi
   oplot, xmed, ymed, psy=10, thi=2*thi, co=!p.background

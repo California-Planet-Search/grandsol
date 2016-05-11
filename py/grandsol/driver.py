@@ -124,14 +124,21 @@ def run_iterations(opt, ppserver=None):
         n = i+1
         idir = "iter%02d" % n
         if not os.path.exists(idir): os.makedirs(idir)
+
+        if opt.meteor is not None:
+            shutil.copy(opt.meteor, os.path.join(idir,"meteor"))
+            include_meteor = True
+        else:
+            include_meteor = False
+
         os.chdir(idir)
         obfile = 'obslist_%02d' % n
         if i == 0:
             vorb = pd.Series(np.zeros_like(df['jd']))
-            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
+            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb, meteor=include_meteor)
         else:
             vorb = vdf['mnvel']
-            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb)
+            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb, meteor=include_meteor)
 
         runorders, joblist = run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite, fudge=opt.fudge, plotres=opt.plotres)
         vdf, mnvel = grandsol.io.combine_orders(runname, obdf, runorders, varr_byorder=True)

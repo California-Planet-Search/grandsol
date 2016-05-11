@@ -250,10 +250,13 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
     sigmas = []
     for i in iters:
         idir = "iter%02d" % i
+        print idir
         if os.path.exists(idir):
             os.chdir(idir)
             obdf = grandsol.io.read_obslist('obslist_%02d' % i)
-        else: continue
+        else:
+            print "WARNING: Could not read obslist_%02d" % i
+            continue
             
         try:
             vdf = grandsol.io.combine_orders(runname, obdf, orders)
@@ -261,6 +264,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
             prev = vdf['mnvel']
             #print i, diff
         except IOError:
+            print "WARNING: Could not read velocities for iteration %d" % i
             continue
 
         velplot_mean(vdf, fmt='s', color=colors[i-1])
