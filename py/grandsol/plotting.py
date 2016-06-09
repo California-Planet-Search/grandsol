@@ -689,7 +689,7 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
     return pl.gcf()
 
 
-def compare_wls_byorder(runname, obdf, orders=[2,3,4,5,6,7,8,9,10]):
+def compare_wls_byorder(runname, obdf, datadir, orders=[2,3,4,5,6,7,8,9,10]):
     """
 
     Plot the input "truth" wavelength solution for all observations and orders from a single ``iGrand`` iteration.
@@ -697,6 +697,7 @@ def compare_wls_byorder(runname, obdf, orders=[2,3,4,5,6,7,8,9,10]):
     Args:
         runname (string): name of the iGrand run (e.g. iGrand_sun or iGrand_4628)
         obdf (DataFrame): observation list data frame as output by ``grandsol.io.read_obslist``
+        datadir (string): path to directory containing data files
         orders (list): list of orders to combine to derive the RVs for each iteration
 
     Returns:
@@ -716,7 +717,7 @@ def compare_wls_byorder(runname, obdf, orders=[2,3,4,5,6,7,8,9,10]):
             for ind in obdf.index:
                 obname = obdf.loc[ind, 'obs']
                 
-                truthfile = "../../%s.%02d" % (obname, o)
+                truthfile = os.path.join(datadir,"%s.%02d" % (obname, o))
                 tdf = grandsol.io.read_truth(truthfile)
 
                 

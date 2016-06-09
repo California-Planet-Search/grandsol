@@ -36,6 +36,10 @@ def args():
                         default=None, nargs=2, type=float, metavar=('Period','Tc'))
     parser.add_argument('--plotres', dest='plotres',action='store_true',help='Plot residuals and evolution of residuals (slow). [False]', default=False)
     parser.add_argument('--plottemp', dest='plottemp',action='store_true',help='Plot template and evolution. [False]', default=False)
+    parser.add_argument('--wave', dest='wave',action='store',help='File containing the initial guess for wavelength solution. [False]', default=None)
+    parser.add_argument('--fixwave', dest='fixwave',action='store_true',help='Fix the wavelength solution? [False]', default=False)
+    parser.add_argument('--lsf', dest='lsf',action='store',help='File containing the initial guess for the LSF. [False]', default=None)
+    parser.add_argument('--fixlsf', dest='fixlsf',action='store_true',help='Fix the LSF? [False]', default=False)
 
     
     opt = parser.parse_args()
@@ -44,7 +48,7 @@ def args():
     opt.fudge = opt.nofudge == False
 
     if opt.obslist != None and opt.truth:
-        opt.truthvel = grandsol.io.read_obslist(opt.obslist)['vorb']
+        opt.truthvel = grandsol.io.read_obslist(os.path.abspath(opt.obslist))['vorb']
         
     return opt
 

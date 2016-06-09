@@ -55,7 +55,7 @@ def clipped_mean(s, sigma=5, inweights=None, iterations=10, cenfunc=np.median, v
     # Calcualte and subtract reference
     ref = cenfunc(s, axis=0)
 
-    if inweights == None:
+    if inweights is None:
         inweights = np.ones(s.shape[0], dtype=float)
         
     for n in range(iterations):

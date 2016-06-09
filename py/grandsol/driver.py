@@ -37,7 +37,9 @@ def execute(cmd, cwd, plotres):
 
     return errcode
     
-def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, orders=[1,2,3,4,5,6,7,8,9,10,11,12], plotres=False):
+def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
+               orders=[1,2,3,4,5,6,7,8,9,10,11,12], plotres=False, waveguess=None, fixwave=False,
+               lsfguess=None, fixlsf=False):
     """
     Run ``grand`` for several orders simultaneously.
 
@@ -49,6 +51,10 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, ord
         fudge (bool): Apply the fudge factor?
         orders (list): list of orders to be run
         plotres (bool): make the residual plots?
+        waveguess (string): Path to input wavelength solution file
+        fixwave (bool): Fix the wavelength solution?
+        lsfguess (bool): Path to input LSF guess file
+        fixlsf (bool): Fix the wavelength solution?
 
     Returns:
         tuple: orders that succesfully finished, and the list of jobs sent
@@ -61,8 +67,20 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True, ord
     for o in orders:
         cwd = os.getcwd()
         cmd = "grand %s %s %d 121111 out=%s.%02d.log vorb+ nitf=10" % (obslist, runname, o, runname, o)
+
         if fudge: cmd += " fudge+"
         else: cmd += " fudge-"
+
+        if waveguess is not None:
+            cmd += " file_wls=%s" % waveguess
+        if fixwave:
+            cmd += " FIND_WLS-"
+
+        if lsfguess is not None:
+            cmd += " file_lsf=%s" % lsfguess
+        if fixlsf:
+            cmd += " FIND_LSF-"
+             
         if overwrite or not os.path.isfile('order_%02d.done' % o): 
             if ppserver == None:
                 execute(cmd, cwd)
@@ -104,7 +122,7 @@ def run_iterations(opt, ppserver=None):
     """
 
     
-    if opt.obslist != None:
+    if opt.obslist is not None:
         f = open(opt.obslist, 'r')
         for l in f.readlines():
             if l.startswith('RJDIR'): datadir = l.split('=')[1].strip().replace('"','')
@@ -140,14 +158,16 @@ def run_iterations(opt, ppserver=None):
             vorb = vdf['mnvel']
             obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb, meteor=include_meteor)
 
-        runorders, joblist = run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite, fudge=opt.fudge, plotres=opt.plotres)
+        runorders, joblist = run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite,
+                                        fudge=opt.fudge, plotres=opt.plotres, waveguess=opt.wave, fixwave=opt.fixwave,
+                                        lsfguess=opt.lsf, fixlsf=opt.fixlsf)
         vdf, mnvel = grandsol.io.combine_orders(runname, obdf, runorders, varr_byorder=True)
 
         grandsol.plotting.velplot_by_order(runname, obdf, runorders, outfile='iGrand_%s_velbyord.pdf' % opt.star)
         grandsol.plotting.velplot_by_order(runname, obdf, runorders, outfile='iGrand_%s_bcbyord.pdf' % opt.star, vsbc=True)
 
         if opt.truth:
-            grandsol.plotting.compare_wls_byorder(runname, obdf, runorders)
+            grandsol.plotting.compare_wls_byorder(runname, obdf, datadir, runorders)
 
         iterdone.append(n)
         os.chdir(rundir)
