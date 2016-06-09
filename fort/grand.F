@@ -1,15 +1,38 @@
 
+
 c
-c below 
-c ---> _LSFINTERP_ = 1 means to use the old way of 
-c                      splining in between the k=9 nodes
-c ---> _LSFINTERP_ = 2 means to use the new way of 
-c                      linearly interpolating between 
-c                      the k=9nodes
-c 
-#define _LSFINTERP_ 2
+c compile with gfortran:
+c
+c gfortran grand.F -o grand.e
+c
 
-
+c-----------------------------------------------------------------------
+c
+c May 27, 2016 --- Jay
+c * allow for a reference file with a default wls
+c   search on "init_wls" to enable.
+c
+c-----------------------------------------------------------------------
+c
+c May 25, 2016 --- Jay
+c * fix bug that told the user when a command-line arg was
+c   not parsable, but did nothing about it; now the routine stops.
+c * FILE_LSF:  new command-line parameter that will allow the 
+c   initial LSF to be specified; this can be used either for 
+c   the WLS or just to kick-start the process 
+c   default:  FILE_LSF='NONE'
+c * FIND_LSF:  new command-line parameter (+/-) that will allow the
+c   user to turn off the finding of the LSF during iterations:
+c   default: + (on)
+c
+c-----------------------------------------------------------------------
+c
+c May 23, 2016 --- Jay
+c * allow the WLS to be pre-specificied...
+c * use FILE_WLS to specify; the default for this param is 'NONE'
+c * Jay:  I'm still not really happy with how things are converging
+c         at the edges of the order.  Hmmm.
+c
 c-----------------------------------------------------------------------
 c
 c May  5, 2016 --- Jay
@@ -350,7 +373,21 @@ c
 #define _WMINQ_ 5000.0
 #define _WMAXQ_ 6000.0
  
+c---------------------------------------------------------------------------
+c
+c below 
+c
+c ---> _LSFINTERP_ = 1 means to use the old way of 
+c                      splining in between the k=9 nodes
+c ---> _LSFINTERP_ = 2 means to use the new way of 
+c                      linearly interpolating between 
+c                      the k=9nodes
+c 
+#define _LSFINTERP_ 2
  
+
+
+
  
       program find_tem_COMPILER
       implicit none
@@ -414,7 +451,6 @@ c
       integer sa, sb        ! s-range to fit spectrum
       integer s1, s2        ! local s-range
  
- 
 c-----------------------------------------------
 c
 c
@@ -468,8 +504,8 @@ c--------------------------------------------
 c
 c just a summary of fits that were made
 c
-      real    coeffw(9), scoeffw
-      real    coeffg(_RATN_)
+      real    coeffw(9)
+      data    coeffw/0.,0.,0.,0.,0.,0.,0.,0.,0./ 
  
       integer p
       real*8  psum, pbar, ssum, sbar, xsum
@@ -494,7 +530,9 @@ c
       real*8  zbarl(_LDIM_), zsigl(_LDIM_) ! averages from above, by line
  
       integer iargc
-      character*80 STRING
+      character*080 STRING
+      character*200 STRING200
+      real*8 lsfq(13)
  
       character*80 RJSOURCE
 
@@ -521,6 +559,18 @@ c
       character*255 FILENAME255
       character*255 REFDIR
       common /REFDIR_/REFDIR
+
+      character*80 FILE_LSF
+      data FILE_LSF/'NONE'/
+
+      logical FIND_LSF
+      data    FIND_LSF/.true./
+
+      character*80 FILE_WLS
+      data FILE_WLS/'NONE'/
+
+      logical FIND_WLS
+      data    FIND_WLS/.true./
 
       logical FIRST_FUDGE
       data FIRST_FUDGE/.true./
@@ -628,6 +678,14 @@ c
      .     _NITf_, ')'
          write(6,6003) 'out=',
      .     'file to contain diagnostics          (default: stdout)'
+         write(6,6003) 'file_wls=',
+     .     'file with the initial wls to use     (default: none)'
+         write(6,6003) 'find_wls{+,-}',
+     .     'should routine determine the wls     (default: +,find)'
+         write(6,6003) 'file_lsf=',
+     .     'file with the initial lsf to use     (default: none)'
+         write(6,6003) 'find_lsf{+,-}',
+     .     'should routine find the lsf by itern (default: +,find)'
          write(6,6006) 'vorb{-,+}',
      .     'read vorb from column 5 of obslist   (default: ',
      .     _DOVORB_, ')'
@@ -669,7 +727,9 @@ c
      .     ' (default: 210100)'
          write(6,6007) 'individually as a three-letter tag and' //
      .     ' a one-digit integer (e.g., mod1)'
-         stop
+         write(6,*) 
+         write(6,*) 
+         stop 'Input valid arguments...'
          endif
 
       call getarg(1,RJSOURCE)
@@ -714,8 +774,62 @@ c
       i = len_trim(LABEL59)
       write(LABEL59(i+1:i+3),'(a,i2.2)') '.', mmin
 
+      write(6,*) 
+      write(6,'(a)') 'GO THROUGH THE COMMAND-LINE ARGUMENTS...'
+      write(6,*) 
       do NARG = 4, NARGs
          call getarg(NARG,STRING)
+         write(6,*) 
+         write(6,'(i2.2,1x,a80)') NARG,STRING(1:80) 
+         write(6,*) 
+         if (STRING(1:9).eq.'FILE_LSF='.or.
+     .       STRING(1:9).eq.'file_lsf=') then
+             FILE_LSF = STRING(10:80)
+             write(6,'(''   FILE_LSF: '',a80)') FILE_LSF
+             FIND_LSF = .false.  
+             write(6,'(''   FIND_LSF: '',l1)') FIND_LSF
+             goto 77
+             endif
+         if (STRING(1:8).eq.'FIND_LSF'.or.
+     .       STRING(1:9).eq.'find_lsf') then
+             if (STRING(9:9).ne.'-'.and.
+     .           STRING(9:9).ne.'+') then   
+                 print*,'  ERROR --- ' 
+                 print*,'  To specify FIND_LSF on the command line,'
+                 print*,'  you must supply it with either + or - '
+                 print*,'  as a flag.'
+                 print*,' ' 
+                 stop 'Need to specify correctly.'
+                 endif
+             if (STRING(9:9).eq.'-') FIND_LSF = .false.
+             if (STRING(9:9).eq.'+') FIND_LSF = .true.
+             write(6,'(''   FIND_LSF: '',l1)') FIND_LSF
+             goto 77
+             endif
+         if (STRING(1:9).eq.'FILE_WLS='.or.
+     .       STRING(1:9).eq.'file_wls=') then
+             FILE_WLS = STRING(10:80)
+             write(6,'(''   FILE_WLS: '',a80)') FILE_WLS
+             FIND_WLS = .false.  
+             write(6,'(''   FIND_WLS: '',l1)') FIND_WLS
+             goto 77
+             endif
+         if (STRING(1:8).eq.'FIND_WLS'.or.
+     .       STRING(1:9).eq.'find_lsf') then
+             if (STRING(9:9).ne.'-'.and.
+     .           STRING(9:9).ne.'+') then   
+                 print*,'  ERROR --- ' 
+                 print*,'  To specify FIND_WLS on the command line,'
+                 print*,'  you must supply it with either + or - '
+                 print*,'  as a flag.'
+                 print*,' ' 
+                 stop 'Need to specify correctly.'
+                 endif
+             if (STRING(9:9).eq.'-') FIND_WLS = .false.
+             if (STRING(9:9).eq.'+') FIND_WLS = .true.
+             write(6,'(''   FIND_WLS: '',l1)') FIND_WLS
+             goto 77
+             endif
          if (STRING(1:5).eq.'nito='.or.
      .       STRING(1:5).eq.'NITo=') then
             read(STRING(6:80),*) NITo
@@ -783,10 +897,10 @@ c
      .           STRING(4:4).lt.'0'.or.string(4:4).gt.'2'.or.
      .           STRING(5:5).lt.'0'.or.string(5:5).gt.'2'.or.
      .           STRING(6:6).lt.'0'.or.string(6:6).gt.'2') then
-                 write(6,*) 'INVALID NUMBER FIELD...'
-                 write(6,*) '   ARG#: ',NARG
-                 write(6,*) '       : ',STRING(1:6)
-                 stop
+                 write(6,*) '   INVALID NUMBER FIELD...'
+                 write(6,*) '      ARG#: ',NARG
+                 write(6,*) '          : ',STRING(1:6)
+                 stop 'Need to specify it correctly.'
                  endif
              read(STRING(1:1),*) OUTPUT_VEL
              read(STRING(2:2),*) OUTPUT_TEM
@@ -807,22 +921,34 @@ c
              goto 77
              endif
 
-         write(*,'(''COMMAND-LINE ARGUMENT UNPARSABLE: '',80a)') STRING
+         write(*,*)
+         write(*,'(''   COMMAND-LINE ARGUMENT UNPARSABLE: '',80a)') 
+     .                  STRING
+         write(*,*)
+         stop 'Rework the command-line argument'
   77     continue
          enddo
 
       write(60,'(/,a)') '# OPTIONAL ARGUMENTS'
-      write(60,'(2a)') 'logfile: ', trim(LOGFILE)
-      write(60,'(a,i0)') 'nito: ', NITo
-      write(60,'(a,i0)') 'nitf: ', NITf
-      write(60,'(a,L1)') 'fudge: ', DOFUDGE
-      write(60,'(a,L1)') 'vorb: ', DOVORB
+      write(60,*)
+      write(60,'(2a)')   '      logfile: ', trim(LOGFILE)
+      write(60,'(a,i0)') '         nito: ', NITo
+      write(60,'(a,i0)') '         nitf: ', NITf
+      write(60,'(a,L1)') '        fudge: ', DOFUDGE
+      write(60,'(a,L1)') '      vorb: ', DOVORB
       write(60,'(a,i1)') 'output_vel: ', OUTPUT_VEL
       write(60,'(a,i1)') 'output_tem: ', OUTPUT_TEM
       write(60,'(a,i1)') 'output_mod: ', OUTPUT_MOD
       write(60,'(a,i1)') 'output_lsf: ', OUTPUT_LSF
       write(60,'(a,i1)') 'output_nrm: ', OUTPUT_NRM
       write(60,'(a,i1)') 'output_lin: ', OUTPUT_LIN
+      write(60,*)
+      write(60,'(a,a)')  '  file_wls: ', FILE_WLS
+      write(60,'(a,l1)') '  find_wls: ', FIND_WLS
+      write(60,*)
+      write(60,'(a,a)')  '  file_lsf: ', FILE_LSF
+      write(60,'(a,l1)') '  find_lsf: ', FIND_LSF
+      write(60,*)
       call flush(60)
 
       write(6,'(''#  '')') 
@@ -901,53 +1027,6 @@ c        endif
 
 
  
- 
-c-------------------------------------------------------
-c
-c if we're not starting from scratch, then
-c read in the data from the previous iteration
-c
-      write(6,*) 'NIT = ',NIT
-      if (NIT.ne.0) then
-         write(6,*) 'Not from scratch...'
-         call read_mod(pix_imn,mod_imn,wav_imn,
-     .                 rat_imn,bar_imn,rej_imn,
-     .                 unim,NIT-1,Ns,LABEL59)
-         call read_vel(zn,NIT-1,Ns,z0,LABEL59)
-         call read_tem(tems,NIT-1,LABEL59)
-         call read_lsf(lsfqkmn,NIT-1,Ns,LABEL59)
-         call find_lines(tems,Ls,sal,sbl,temu,LABEL59)
-         call tell_rej(wav_imn,tel_imn,Ns)
-
-         call smoo_tem(tems,NIT)
-
- 
-         write(6,*) 'IMAGES NOT USED: '
-         s = 0
-         do n = 1, Ns
-            if (.not.unim(n)) then
-               s = s + 1
-               write(6,*) '----> ',n,s
-               endif
-            enddo
- 
-         write(6,*) 'remodel...  Ns: ' ,Ns
-         call fill_mod_imn(mod_imn,wav_imn,lsfqkmn,tems,z0,unim,
-     .                     Ns,MMIN,MMAX)
- 
-         write(6,*) 'find_uuu...'
-         call find_uuuimn(pix_imn,mod_imn,rat_imn,
-     .                    bar_imn,rej_imn,uuu_imn,met_imn,
-     .                    wav_imn,z0,unim,Ns,MMIN,MMAX)
-
- 
-         goto 777 ! go and start mid-stream
-         endif
- 
-c-------------------------------------------------------
-c
-c NIT=0... start from scratch...
-c
       write(6,*) ' '
       write(6,*) 'call read_raw...'
 
@@ -957,21 +1036,23 @@ c
      .              rej_imn,met_imn,
      .              wav_imn,unim,z0,Ns,MMIN,MMAX)
 
-      write(6,*) 
-      write(6,*) 'call wavi2wavk...'
+      if (FILE_WLS(1:4).ne.'NONE') then
+          write(6,*) ' '
+          write(6,*) 'Initialize WLS from file: ',FILE_WLS(1:40)
+          write(6,*) ' '
+          call read_wls(wav_kmn,wav_imn,FILE_WLS,Ns)
+          write(6,*) ' '
+          write(6,*) '       got WLS from FILE_WLS = ',FILE_WLS(1:40)
+          write(6,*) ' '
+          endif 
 
-      do N = 1, Ns 
-         do M = MMIN, MMAX
-            call wavi2wavk(wav_imn(1,M,N),wav_kmn(1,M,N))
-            call wavk2wavi(wav_kmn(1,M,N),wav_i)
-c           do i = 1, _IDIM_
-c              write(18,118) N,M,I,rk,wav_imn(I,M,N),wav_i(I),
-c    .                       wav_imn(I,M,N)-wav_i(I)
-c118           format(1x,i5.5,1x,i2.2,1x,i4.4,1x,f8.5,
-c    .                5x,8f16.9)
-c              enddo
-            enddo!M
-         enddo!N
+      if (FILE_LSF(1:4).ne.'NONE') then
+          call read_lsf(lsfqkmn,Ns,FILE_LSF)
+          write(6,*) ' '
+          write(6,*) '       got LSF from FILE_LSF =  ',FILE_LSF(1:40)
+          write(6,*) '                    FIND_LSF = ',FIND_LSF
+          write(6,*) ' '
+          endif
 
       do n = 1, Ns
          zn(n) = z0(n)
@@ -994,9 +1075,6 @@ c
 
       BADs = 0
       open(15,file='LOG.INITMOD.OUT',status='unknown')
-      open(16,file='LOG.INITWLX.OUT',status='unknown')
-      write(FILENAME,'(''LOG.WAVKOUT.M'',i2.2)') MMIN
-      open(17,file=FILENAME,status='unknown')
       do n = 1, Ns
          if (.not.unim(n)) goto 445
          do m = MMIN, MMAX
@@ -1004,7 +1082,8 @@ c
          write(6,*) 'call find_initmod...'
  
          call find_initmod(pix_imn(1,m,n),
-     .                     wav_imn(1,m,n),gopt,dopt,sopt,m,emin)
+     .                     wav_imn(1,m,n),gopt,dopt,sopt,m,emin,
+     .                     FIND_WLS)
  
          write(6,*)
          write(15,95) n,m,gopt,dopt,sopt,emin
@@ -1016,7 +1095,7 @@ c
          write(6,98) (k,k=1,9), (k,k=1,9)
    98    format('   ',2x,' ',3x,' ',2x,' ',2x,1x,2x,1x,
      .                      2x,09(3x,i1,3x),
-     .                      2x,09(4x,i1,2x))
+     .                      2x,09(3x,i1,2x))
 
          if (gopt.eq.43) then
              BADs = BADs + 1
@@ -1032,82 +1111,75 @@ c------------------------------------------------------------
 c
 c take the gaussians derived above and make a fine-scaled LSF
 c
-         call gsni2lsfji(gsn_im(1,m),lsfjim(1,1,m))
- 
+         if (FILE_LSF(1:4).eq.'NONE') then
+                call gsni2lsfji(gsn_im(1,m),lsfjim(1,1,m))
+             else
+                call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsfjim(1,1,m)) 
+             endif
+
          call find_ftso(ftso,wav_imn(1,m,n))
-         call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m)) ! find the rough model of the obsns
+         call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
          call find_rat0(pix_imn(1,m,n),
      .                  mod_imn(1,m,n),
      .                  rat_imn(1,m,n))
  
-
  
 c------------------------------------------------------------
 c
 c go through an iterative process wherein we successively
-c improve the WLS, the LSF, and the template in a (hopefully)
-c virtuous cycle.  In the end, we'll stick with this WLS,
-c but will end up improving the LSF and template quite a bit
-c via detailed least-squares; we reject data points that are
-c too discordant.  This is done each time, so that if a
-c point is removed, it can be redeemed.
+c improve the WLS, the (gaussian) LSF, and the template in a 
+c (hopefully) virtuous cycle.  In the end, we'll stick with 
+c this WLS, but will end up improving the (gaussian) LSF 
+c and template quite a bit via detailed least-squares; 
+c we reject data points that are too discordant.  This is 
+c done each time, so that if a point is removed, it can 
+c be redeemed.
 c
          done = .false.
          do NNIT = 1, 99
 
-            if (NNIT.gt.10) then
-                  call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                            wav_imn(1,m,n),rat_imn(1,m,n),
-     .                            tem_imn(1,m,n),
-     .                            lsfjim(1,1,m),coeffw)
-               else
-                  call tweak_wls1(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                            wav_imn(1,m,n),rat_imn(1,m,n),
-     .                            tem_imn(1,m,n),
-     .                            lsfjim(1,1,m),coeffw)
-                  call polyfit_w(wav_imn(1,m,n),
-     .                           wav_imn(1,m,n),AA,BB,CC,DD,EE)
-               endif
+            if (FIND_WLS) then
+                call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                          wav_imn(1,m,n),rat_imn(1,m,n),
+     .                          tem_imn(1,m,n),
+     .                          lsfjim(1,1,m),coeffw)
+                call wavi2wavk(wav_imn(1,m,n),
+     .                         wav_kmn(1,m,n))
+                endif
 
             call find_ftso(ftso,wav_imn(1,m,n))
   
-            if (NNIT.le.20) then
-               call tweak_gsn(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                        wav_imn(1,m,n),rat_imn(1,m,n),
-     .                        gsn_im(1,m),lsfjim(1,1,m),coeffg)
-               call lsfji2lsfqk(lsfjim(1,1,m),lsfqkmn(1,1,m,n))
+            if (FILE_LSF(1:4).eq.'NONE') then
+                if (NNIT.le.20) then
+                    call tweak_gsn(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                             wav_imn(1,m,n),rat_imn(1,m,n),
+     .                             gsn_im(1,m),lsfjim(1,1,m))
+                    call lsfji2lsfqk(lsfjim(1,1,m),lsfqkmn(1,1,m,n))
+                    endif
                endif
  
-            call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m)) ! find the rough model of the obsns
+            call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
  
-            call find_tem_snglQ(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                          mod_imn(1,m,n),rat_imn(1,m,n),
+            call find_tem_snglQ(pix_imn(1,m,n),rej_imn(1,m,n),  ! find a v smooth version of the template 
+     .                          mod_imn(1,m,n),rat_imn(1,m,n),  !      from a single observation
      .                          tem_imn(1,m,n))
  
             nrej = find_locrej(pix_imn(1,m,n),mod_imn(1,m,n),
      .                         rej_imn(1,m,n),sigi)
- 
-            write(6,444) 0,n,m,NNIT,nrej,(coeffw(p),p=1,9),
+
+            if (NNIT.lt.10.or.NNIT.eq.NNIT/10*10) 
+     .      write(6,444) 0,n,m,NNIT,nrej,(coeffw(p),p=1,9),
      .                                   (lsfqkmn(7,k,m,n),k=1,_KDIM_)
-            if (NNIT.eq.50)
-     .      write(16,444) 0,n,m,NNIT,nrej,(coeffw(p),p=1,9),
-     .                                    (lsfqkmn(7,k,m,n),k=1,_KDIM_)
- 
   444       format('NIT',i2.2,':',i3.3,'.',i2.2,'_',i2.2,1x,i2,1x,
      .                         3x,09(f6.3,1x),
-     .                         3x,09(f6.3,1x))
-            scoeffw = 0.
-            do p = 1, 5
-               scoeffw = scoeffw + abs(coeffw(p))
-               enddo
-c            if (scoeffw.lt.0.025.and.done) goto 443
-c           if (NNIT.ge.3..and.scoeffw.lt.0.025) done = .true.
+     .                         3x,09(f5.3,1x))
+            if (.not.FIND_WLS.and.NNIT.ge.05) goto 443
             enddo!NNIT
  443        continue
  
          call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
      .                                 rej_imn(1,m,n))
- 
+
          enddo!m
  
  
@@ -1158,34 +1230,21 @@ c
      .                                       *(fudge(ifdge+1,m)
      .                                        -fudge(ifdge  ,m))
                      endif
-                  if (i.eq.2000) 
-     .            write(6,*)'-> i=2000  PRE-FUDG: ',pix_imn(i,m,n),cfdge
+                  if (i.eq.2000)
+     .            write(6,166) '-> i=2000  PRE-FUDG: ',
+     .                                     pix_imn(i,m,n),cfdge
+  166             format(a21,1x,f10.3,1x,f10.6)
                   pix_imn(i,m,n) = pix_imn(i,m,n) - bar_imn(i,m,n)*cfdge
-                  if (i.eq.2000) 
-     .            write(6,*)'-> i=2000 POST-FUDG: ',pix_imn(i,m,n),cfdge
+                  if (i.eq.166) 
+     .            write(6,166) '-> i=2000 POST-FUDG: ',
+     .                                     pix_imn(i,m,n),cfdge
                   enddo
                enddo
             endif
-
-         do m = MMIN, MMAX
-            call wavi2wavk(wav_imn(1,m,n),wav_kmn(1,m,n))
-            write(17,117) n,m,(wav_kmn(k,m,n),k=1,9)
-  117       format(1x,i4.4,1x,i2.2,1x,9(1x,f13.7))
-            if (.false.) then
-                call wavi2wavk(wav_imn(1,M,N),wav_kmn(1,M,N))
-                call wavk2wavi(wav_kmn(1,M,N),wav_i)
-                do i = 1, _IDIM_
-                   write(18,118) N,M,I,wav_imn(I,M,N),wav_i(I),
-     .                                 wav_imn(I,M,N)-wav_i(I)
- 118               format(1x,i5.5,1x,i2.2,1x,i4.4,5x,3f16.9)
-                   enddo
-                endif
-            enddo
   445    continue! not unim
          enddo!n
          close(15)
-         close(16)
-         close(17)
+
 
          if (BADs.ne.0) then
              write(6,*) ' '
@@ -1207,12 +1266,10 @@ c
              goto 3
     4        close(91)
              write(6,*) ' '
-             write(6,*) 'Cannot continue.'
-             write(6,*) ' '
-             stop
+             stop 'Cannot continue; bad observation'
              endif
 
-c     if (.true.) STOP
+      write(6,'(''wav_imn(21,09,001): '',f15.8)') wav_imn(21,09,001)
 
 
      
@@ -1244,6 +1301,7 @@ c restarted at an intermediate stage
 c
  
       if (NIT.eq.0) then
+         call save_wls(wav_kmn,NIT,Ns,LABEL59,MMIN,MMAX)
          call save_mod(pix_imn,mod_imn,wav_imn,
      .                 rat_imn,bar_imn,
      .                 rej_imn,tel_imn,met_imn,
@@ -1304,7 +1362,8 @@ c
                call find_rati_bar(pix_imn(1,m,n),mod_imn(1,m,n),   ! find the scale that takes
      .                            bar_imn(1,m,n),rat_imn(1,m,n),   !    model*rat ---> pix
      .                            rej_imn(1,m,n),met_imn(1,m,n),NIT)                  
-               call find_lsfq_sp(pix_imn(1,m,n),                   ! using the WLS and normalization,
+               if (FIND_LSF) 
+     .         call find_lsfq_sp(pix_imn(1,m,n),                   ! using the WLS and normalization,
      .                           rej_imn(1,m,n),                   !    find the spatially var LSF
      .                           rat_imn(1,m,n),fxto,              !    that best fits the fxto model
      .                           lsfqkmn(1,1,m,n),lsfjim(1,1,m))   !    to the data
@@ -1484,7 +1543,7 @@ c
       write(60,'(a,L1)') '_LINUX_: ', _LINUX_
       close(60)
  
-      stop 'stuck the landing!'
+      stop 'successful completion of program'
       end
  
  
@@ -1530,7 +1589,7 @@ c
          write(6,*) '   which  is  greater  than NMAX:',NMAX
          write(6,*) ' '
          write(6,*) ' '
-         stop
+         stop 'you need to look things over...'
          endif
  
  
@@ -1632,7 +1691,7 @@ c
          write(6,*) '   which  is  greater  than NMAX:',NMAX
          write(6,*) ' '
          write(6,*) ' '
-         stop
+         stop 'you need to look things over...'
          endif
  
  
@@ -1996,8 +2055,8 @@ c
       subroutine find_bari(pixi,bari,reji)
       implicit none
  
-      real   pixi(_IDIM_)   ! INPUT  pixel array
-      real   bari(_IDIM_)   ! OUTPUT average array
+      real   pixi(_IDIM_)      ! INPUT  pixel array
+      real   bari(_IDIM_)      ! OUTPUT average array
       integer*1 reji(_IDIM_)   ! INPUT  array of pixels to use
  
       integer i, i1, i2
@@ -2706,7 +2765,7 @@ c
          write(6,*) '     Ss: ',Ss
          write(6,*) ' _SFIT_: ',_SFIT_
          write(6,*) '         '
-         stop
+         stop 'figure out what happened...'
          endif
  
  
@@ -2975,7 +3034,7 @@ c
      .          (su.le.s2-10.or.s2.eq.sbu)) u = 1
   144       format(1x,i6.6,1x,f12.6,1x,f10.6,1x,f10.6,1x,i1)
             if (u.eq.1) tems(su) = teml(su)
-            write(44,144) su,ww_s(su),teml(su),temh(su),u
+c           write(44,144) su,ww_s(su),teml(su),temh(su),u
             enddo
          write(6,190) s,s1,s2,ww_s(s1),ww_s(s2),
      .                        teml((s1+s2)/2),
@@ -3952,7 +4011,7 @@ c
 c------------------------------------------------------
  
  
-      subroutine find_initmod(pixi,wavi,gopt,dopt,sopt,m,emin)
+      subroutine find_initmod(pixi,wavi,gopt,dopt,sopt,m,emin,FIND_WLS)
       implicit none
  
       real   pixi(4021)
@@ -3961,6 +4020,8 @@ c------------------------------------------------------
       integer dopt
       integer sopt
       integer m
+      real    emin
+      logical FIND_WLS 
  
       integer k, i
       real*8  sump
@@ -3977,11 +4038,11 @@ c------------------------------------------------------
       real    ratu
       real    lsfj_gg
       real    psum, msum
-      real    emin
       integer gmin, dmin, smin
       real    modr
       real*8  wav_rim_frompoly
- 
+
+      print*,'  wavi(0021): ',wavi(0021),wavi(4000)
  
 c
 c Set up the input spectum which will be broadened
@@ -4062,6 +4123,7 @@ c
                   e = e + abs(pixi(i+ii)-ratu*modo(o+ii*10))
                   enddo
                enddo!i
+  129       format(1x,i2,1x,i3,1x,i3,1x,f12.2,1x,i1)
             if (e.lt.emin) then
                emin = e
                smin = s
@@ -4076,7 +4138,7 @@ c
       gopt = gmin
       dopt = dmin
       sopt = smin
- 
+
 c------------------------------------------
 c
 c compute the WLS for the current solution
@@ -4087,18 +4149,21 @@ c
          oo = int(ro)
          if (oo.lt.00001) oo = 00001
          if (oo.gt.40400) oo = 40400
-         wavi(i) = wavo(oo) + (ro-oo)*(wavo(oo+1)-wavo(oo))
-c
-c redo... new way
-c
-         ri = 1 + (ro-101)*0.1
-         wavi(i) = wav_rim_frompoly(ri,m)
+         if (FIND_WLS) then
+           !wavi(i) = wavo(oo) + (ro-oo)*(wavo(oo+1)-wavo(oo))
+            endif
          enddo
  
+      print*,'  wavi(0021): ',wavi(0021),wavi(4000)
+
       return
       end
  
- 
+
+c---------------------------------------------------------
+c
+c
+c 
       subroutine polyfitk(xi,xo,
      .                    APOLY,BPOLY,CPOLY,DPOLY,EPOLY)
       implicit none
@@ -5088,7 +5153,7 @@ c
       write(6,'(''ERROR OPENING  '')')
       write(6,'(''     RDSKFILE: '',200a)') RDSKFILE
       write(6,'(''               '')')
-      stop
+      stop 'error opening file'
       end
  
  
@@ -5139,9 +5204,6 @@ c this line will read in the entire fits file
 c    into one variable
 c
       read(10,rec=1,iostat=ios) stream
- 
-c     write(6,'(80a)') (stream(i),i=1,80)
-c     if (.true.) stop
  
       irec = irec/4*4 + 1
       jold = 0
@@ -5419,23 +5481,12 @@ c
          zbar = zbar + (zn(n)-z0(n))
          enddo
       zbar = zbar/NIMs
-c     do n = 1, NIMs
-c        zn(n)  = zn(n)  - zbar
-c        zbarn(n) = zbarn(n) - zbar
-c        enddo
  
-      write(6,'(''          '')')
-      write(6,'(''          '')')
-      write(6,'(''   ZBAR:  '',f12.10)') zbar
-      write(6,'(''          '')')
-      write(6,'(''          '')')
-
-
       write(FILENAME,'(''.'',i2.2,''.vel'')') NITu
       FILENAME = TRIM(LABEL59) // FILENAME
 
-      write(6,'(''SAVE_VEL: '',80a)') FILENAME
-      write(6,'(''#   ZBAR: '',f12.10)') zbar
+      write(6,'(''SAVE_VEL: '',a,'' ZBAR: '',f12.10)') 
+     .            trim(FILENAME),zbar
       open(10,file=FILENAME,status='unknown')
       do n = 1, NIMs
          if (unim(n)) then
@@ -5512,7 +5563,8 @@ c
       logical unim(NIMs)
       character*59 LABEL59
       integer MMIN, MMAX
- 
+
+      real    lsfq(13) 
       integer q,k,m,n
       character*80 FILENAME
 
@@ -5527,16 +5579,29 @@ c
 
       write(*,'(''SAVE: '',80a)') FILENAME
       open(10,file=FILENAME,status='unknown')
+  108 format('#')
+  109 format('#','  n',1x,' m',1x,'k',1x,
+     .       06(i3,6x),1x,i3,5x,1x,06(i3,6x))
+      write(10,108)
+      write(10,109) (q,q=-6,6)
+      write(10,108)
       do n = 1, NIMs
          if (unim(n)) then
             do m = MMIN, MMAX
                do k = 001, _WAVN_
-                  write(10,110) n,m,k,(lsfqkmn(q,k,m,n),q=1,13)
-  110             format(1x,i3.3,1x,i2.2,1x,i1,1x,13(f8.5,1x))
+                  do q = 1, 13
+                     lsfq(q) = lsfqkmn(q,k,m,n)
+                     if (.not.lsfq(q).gt.-0.999) lsfq(q) = -0.999
+                     if (.not.lsfq(q).lt. 9.999) lsfq(q) =  9.999
+                     enddo
+                  write(10,110) n,m,k,(lsfq(q),q=1,13)
+  110             format(1x,i3.3,1x,i2.2,1x,i1,1x,
+     .                   06(f8.6,1x),1x,f8.5,1x,06(1x,f8.6))
                   enddo
                enddo
             endif
          enddo
+      close(10)
       return
       end
  
@@ -5655,8 +5720,9 @@ c
       open(10,file=FILENAME,status='old')
       do n = 1, NIMs
         read(10,*) nn,zn(n),z0(n)
-        if (n.ne.nn) stop
+        if (n.ne.nn) stop 'n.ne.nn'
         enddo
+      close(10)
  
       return
       end
@@ -5705,43 +5771,74 @@ c-----------------------------------------------------------
 c
 c
 c
-      subroutine read_lsf(lsfqkmn,NIT,NIMs,LABEL59)
+      subroutine read_lsf(lsfqkmn,Ns,FILE_LSF)
       implicit none
  
-      real lsfqkmn(_QDIM_,_KDIM_,_MDIM_,NIMs)
-      integer NIT, NIMs
-      character*59 LABEL59
+      real lsfqkmn(_QDIM_,_KDIM_,_MDIM_,Ns)
+      integer      Ns
+      character*80 FILE_LSF
  
       integer q,k,m,n
-      character*80 FILENAME
+
       integer ku,mu,nu
       real    lsfq(_QDIM_)
 
-      integer NITu
-      integer OUTPUT_LSF
-      common /OUTPUT_LSF_/OUTPUT_LSF
-      NITu = NIT
-      if (OUTPUT_LSF.eq.1) NITu = 99
- 
-      write(FILENAME,'(''.'',i2.2,''.lsf'')') NITu
-      FILENAME = TRIM(LABEL59) // FILENAME
+      character*200 STRING200
+      integer n1, n2
+      integer m1, m2
+      integer k1, k2
 
-      write(6,'(''READ_LSF: '',80a)') FILENAME
-      open(10,file=FILENAME,status='old')
-      nu = 0
-    1 continue
-      read(10,*,end=2) n,m,k,(lsfq(q),q=1,_QDIM_)
-      do q = 1, _QDIM_
-         lsfqkmn(q,k,m,n) = lsfq(q)
+      do N = 1, Ns
+         do M = 1, _MDIM_
+            do k = 01, _KDIM_
+            do q = 01, _QDIM_
+               lsfqkmn(q,k,M,N) = 0.
+               enddo
+               enddo
+            enddo
          enddo
-      if (nu.ne.n.and.n.eq.n/25*25) write(6,*) '  n: ',n
-      nu = n
+ 
+      open(10,file=FILE_LSF,status='old')
+    1 continue
+      read(10,'(a200)',end=2) STRING200
+      if (STRING200(1:1).eq.'#') goto 1
+      read(STRING200,*) n,m,k,(lsfq(q),q=1,_QDIM_)
+      n1 = n
+      n2 = n
+      if (n.eq.0) then
+          n1 =  1 
+          n2 = Ns
+          endif
+      m1 = m
+      m2 = m
+      if (m.eq.0) then
+          m1 = 1
+          m2 = _MDIM_
+          endif
+      k1 = k
+      k2 = k
+      if (k.eq.0) then
+          k1 = 1
+          k2 = _KDIM_
+          endif
+      do nu = n1, n2
+      do mu = m1, m2
+      do ku = k1, k2
+         do q = 1, _QDIM_
+            lsfqkmn(q,ku,mu,nu) = lsfq(q)
+            enddo
+         enddo
+         enddo
+         enddo
       goto 1
     2 continue
+
+      close(10)
  
       return
       end
  
+
  
  
  
@@ -5856,7 +5953,7 @@ c
          write(6,*) '    .                                        '
          write(6,*) '    .                                        '
          write(6,*) '                                             '
-         stop
+         stop 'VSYST mis specified'
          endif
       read(STRING(8:18),*) velsys
       write(6,'(''---> SYSTEMIC VELOCITY: '',f10.2,'' m/s'')') velsys
@@ -5879,7 +5976,7 @@ c
             enddo
          if (i1.eq.0.or.i2.eq.0) then
             write(6,*) 'tried to assign RJDIR, but failed.'
-            stop
+            stop 'this was a problem'
             endif
          RJDIR  = STRING(i1:i2)
          nrjdir = i2-i1+1
@@ -5903,7 +6000,7 @@ c
          write(6,*) ' You need to recompile after changing '
          write(6,*) ' the _NDIM_ parameter in the defaults.'
          write(6,*) '                                      '
-         stop
+         stop 'this was a problem'
          endif
       if (barycorr.lt.minBC) minBC = barycorr
       if (barycorr.gt.maxBC) maxBC = barycorr
@@ -5988,8 +6085,16 @@ c
       call block_meteor(FILEU,met_imn(1,1,n),METEORFILE)
 
       unim(n) = .true.  ! use this image
+
       call init_wavim(wav_imn(1,1,n),MMIN,MMAX) ! load in the initial, default WLS
- 
+
+c
+c 2016.05.27 --- can just call this to get 
+c                the solution from a reference file
+c
+c     call init_wls(wav_kmn,wav_imn,Ns)
+c
+
 c----------------------------------------------------
 c
 c report on what was read in...
@@ -5999,7 +6104,7 @@ c
       goto 3
  
    4  close(20)
-      write(6,*) ' '
+c     write(6,*) ' '
 
 c----------------------------------------------------
 c
@@ -6180,45 +6285,6 @@ c
       return
       end
  
- 
- 
-c-----------------------------------------------
-c
-c
-c
-      subroutine polyfit_w(wa,wb,AA,BB,CC,DD,EE)
-      implicit none
- 
-      real*8 wa(4021)
-      real*8 wb(4021)
-      real*8 AA,BB,CC,DD,EE
- 
-      real*8 abcde_i(5,4021)
-      common /wav_abcde_comm/abcde_i
-      integer i
-      real*8  rx
- 
-      AA = 0.0d0
-      BB = 0.0d0
-      CC = 0.0d0
-      DD = 0.0d0
-      EE = 0.0d0
-      do i = 0021, 4001
-         AA = AA + wa(i)*abcde_i(1,i)/1.0d11
-         BB = BB + wa(i)*abcde_i(2,i)/1.0d11
-         CC = CC + wa(i)*abcde_i(3,i)/1.0d11
-         DD = DD + wa(i)*abcde_i(4,i)/1.0d11
-         EE = EE + wa(i)*abcde_i(5,i)/1.0d11
-         enddo
- 
-      do i = 0001, 4021
-         rx = (i-2011)/1990.0d0
-         wb(i) = AA + BB*rx    + CC*rx**2
-     .              + DD*rx**3 + EE*rx**4
-         enddo
- 
-      return
-      end
  
  
  
@@ -6759,161 +6825,10 @@ c     .                     1x,f12.3,1x,f12.3,1x,f12.3)
 
       enddo!NNIT
 
-c     call wavi2wavk(wavi,wavk)
-c     call wavk2wavi(wavk,wavi)
-
       return
       end
  
- 
-c-----------------------------------------------
-c
-c
-c
-c
-c-----------------------------------------------
- 
-      subroutine tweak_wls1(pixi,reji,wavi,nrmi,temi,lsfji,coeffw)
-      implicit none
- 
-      real   pixi(_IDIM_)
-      integer*1 reji(_IDIM_)
-      real*8 wavi(_IDIM_)
-      real   nrmi(_IDIM_)
-      real   temi(_IDIM_)
-      real   lsfji(_JDIM_,_IDIM_)
-      real   coeffw(9)
- 
-      real   modo(_ODIM_)
-      real   fxto(_ODIM_)
- 
-      real*8 wavh(_IDIM_)
- 
-      real   modx(_IDIM_)
-      real   modi(_IDIM_)
-      real   modl(_IDIM_), modlu
-      integer o
-      real    ri, t, f, ftsw
-      integer ii, j, i, ic
-      real*8  w
-      real    msuma
-      real    msumb
-      real    projn_i(5,_IDIM_)
-      real*8  rn
-      integer n, n1, n2
-      integer    ni, nj
-      integer    i1, i2
-      real nrm
- 
-      real*8  normal(5,5)
-      real*8  lamron(5,5)
-      real*8  vector(5)
-      real*8  coeffs(5)
- 
-      do o = 00001, _ODIM_
-         ri = 1 + (o-101)*0.1
-         ii = int(ri)
-         if (ii.lt._IBEG_) ii = _IBEG_
-         if (ii.gt._IEND_) ii = _IEND_
-         w   = wavi(ii) + (ri-ii)*(wavi(ii+1)-wavi(ii))
-         t   = temi(ii) + (ri-ii)*(temi(ii+1)-temi(ii))
-         nrm = nrmi(ii) + (ri-ii)*(nrmi(ii+1)-nrmi(ii))
-         f = ftsw(w)
-         fxto(o) = f*t*nrm
-         enddo
- 
- 
-      do o = 00001, _ODIM_
-         i = 1 + (o-101)*0.1
-         if (i.le._IBEG_) i = _IBEG_
-         if (i.ge._IEND_) i = _IEND_
-         modo(o) = 0.
-         do j = -100, 100
-            if (o+j.gt.00001.and.o+j.lt._ODIM_)
-     .      modo(o) = modo(o) + fxto(o+j)*lsfji(101+j,i)
-            enddo
-         enddo
- 
-      do i = 0001, _IDIM_
-         o = 101 + (i-1)*10
-         modx(i) = (modo(o+1) - modo(o-1))/2
-         modi(i) = modo(o)
-         rn = 1 + 4.*(i-_RATB_)/(_RATY_-_RATB_)
-         call rspline_fp(rn,5,projn_i(1,i),n1,n2)
-         enddo
- 
-      do ni = 1, 5
-      do nj = 1, 5
-         normal(ni,nj) = 0.
-         do i = _RATB_, _RATY_
-            if (reji(i).eq.0)
-     .      normal(ni,nj) = normal(ni,nj) + projn_i(ni,i)*modx(i)
-     .                                     *projn_i(nj,i)*modx(i)
-            enddo
-         enddo
-         enddo
- 
-      call dinvertNxN(normal,lamron,5,5)
- 
-      do n = 1, 5
-         vector(n) = 0
-         do i = _RATB_, _RATY_
-            if (reji(i).eq.0)
-     .      vector(n) =
-     .      vector(n) + (pixi(i)-modi(i))*projn_i(n,i)*modx(i)
-            enddo
-         enddo
- 
-      do n = 1, 5
-         coeffs(n) = 0
-         do nj = 1, 5
-            coeffs(n) = coeffs(n) + lamron(n,nj)*vector(nj)
-            enddo
-         enddo
- 
-      do i = 0001, _IDIM_
-         modl(i) = 0.
-         do n = 1, 5
-            modl(i) = modl(i) + coeffs(n)*projn_i(n,i)
-            enddo
-         enddo
- 
-      do i = 0001, _IBEG_
-         wavh(i) = wavi(_IBEG_) + (i-_IBEG_)*(wavi(_IBEG_+1)-
-     .                                        wavi(_IBEG_  ))
-         enddo
-      do i = _IEND_, _IDIM_
-         wavh(i) = wavi(_IEND_) + (i-_IEND_)*(wavi(_IEND_  )-
-     .                                        wavi(_IEND_-1))
-         enddo
- 
-      do i = _IBEG_, _IEND_
-         ic = i
-         if (ic.lt._IBEG_+1) ic = _IBEG_+1
-         if (ic.gt._IEND_-1) ic = _IEND_-1
-         i1 = ic-1
-         i2 = ic+1
-         modlu = modl(i)
-         if (modlu.gt. 1) modlu =  1
-         if (modlu.lt.-1) modlu = -1
-         wavh(i) = wavi(i) + modlu/06/(i2-i1)*(wavi(i2)-wavi(i1))
-         enddo
- 
-      do i = 0001, _IDIM_
-         wavi(i) = wavh(i)
-         enddo
- 
-      do n = 1, 9
-         coeffw(n) = 0.
-         enddo
 
-      do n = 1, 5
-         coeffw(1+2*(n-1)) = coeffs(n) 
-         enddo
- 
-      return
-      end
- 
  
 c-----------------------------------------------
 c
@@ -6922,7 +6837,7 @@ c
 c
 c-----------------------------------------------
  
-      subroutine tweak_gsn(pixi,reji,wavi,nrmi,gsni,lsfji,coeffg)
+      subroutine tweak_gsn(pixi,reji,wavi,nrmi,gsni,lsfji)
       implicit none
  
       real   pixi(_IDIM_)
@@ -6931,7 +6846,6 @@ c-----------------------------------------------
       real   nrmi(_IDIM_)
       real   gsni(_IDIM_)
       real   lsfji(_JDIM_,_IDIM_)
-      real   coeffg(_WAVN_)
  
       real   modo(_ODIM_)
       real   modd(_ODIM_)
@@ -7061,19 +6975,11 @@ c-----------------------------------------------
             enddo
          enddo
  
-c     write(*,'(''tweak_gsn: '',40x,99f7.3)') (coeffs(n),n=1,_WAVN_)
- 
-      do n = 1, _WAVN_
-         i = _WAVB_ + (_WAVY_-_WAVB_)*(n-1)/(_WAVN_-1.0)
-         coeffg(n) = gsni(i)
-         enddo
  
       return
       end
- 
-c#include "51.ROUTINES/find_vel4sunX.f"
- 
- 
+
+
  
 c------------------------------------------------------
 c
@@ -8204,10 +8110,13 @@ c
             write(44,144) n,mo,(resv(v),v=1,11),nrej,ctot,
      .                    dis/nns,dws/nns
             if (mo.eq.0)
-     .      write(06,144) n,mo,(resv(v),v=1,11),nrej,ctot,
+     .      write(06,145) n,mo,(resv(v),v=1,11),nrej,ctot,
      .                    dis/nns,dws/nns
             enddo!m
-  144       format(i3.3,1x,i2.2,1x,
+  144       format(1x,i3.3,1x,i2.2,1x,
+     .             5(1x,f7.4),4x,f7.4,4x,5(f7.4,1x),i5,1x,i8,1x,
+     .             f8.3,1x,f8.3)
+  145       format(6x,i3.3,1x,i2.2,1x,
      .             5(1x,f7.4),4x,f7.4,4x,5(f7.4,1x),i5,1x,i8,1x,
      .             f8.3,1x,f8.3)
   555    continue!not unim
@@ -13288,8 +13197,8 @@ c ord=16
       logical match
 
     
-      write(6,*) 'BLOCK_METEOR:  METEORFILE: ',METEORFILE 
       if (METEORFILE(1:4).eq.'NONE') return
+      write(6,*) 'BLOCK_METEOR:  METEORFILE: ',METEORFILE 
 
       RDSKFILE_RJ = 'NULL'
       do i = 1, 80
@@ -13332,7 +13241,7 @@ c ord=16
       write(6,*) 'could not find match in meteor file...'
       write(6,*) 'FILEU   : ',RDSKFILE
       write(6,*) 'FILEU_RJ: ',RDSKFILE_RJ
-      stop 
+      stop 'must abort' 
 
       return
       end
@@ -13393,14 +13302,14 @@ c
          tems(s) = temb(s) + temx(s)
          enddo
 
-      write(FILENAME,'(''LOG.SMOO_TEM_NIT'',i2.2)') NIT 
-      open(92,file=FILENAME,status='unknown')
-      do s = 0001, _SDIM_
-         write(92,192) s,ww_s(s),tem0(s),tems(s),
-     .                           temb(s),temd(s), temx(s)
-  192    format(i6.6,1x,f9.4,1x,8(1x,f8.5))
-         enddo
-      close(92)
+c     write(FILENAME,'(''LOG.SMOO_TEM_NIT'',i2.2)') NIT 
+c     open(92,file=FILENAME,status='unknown')
+c     do s = 0001, _SDIM_
+c        write(92,192) s,ww_s(s),tem0(s),tems(s),
+c    .                           temb(s),temd(s), temx(s)
+c 192    format(i6.6,1x,f9.4,1x,8(1x,f8.5))
+c        enddo
+c     close(92)
 
       return
       end
@@ -13630,7 +13539,7 @@ c
                enddo
             enddo
          call barsig(rl,Ls,bar,sig,Lu)
-         write(47,147) s,www,wwa,wwb,bar,sig,Ls,Lu,tems(s)
+c        write(47,147) s,www,wwa,wwb,bar,sig,Ls,Lu,tems(s)
   147    format(1x,i6.6,3x,f12.6,1x,f12.6,1x,f12.6,
      .                  3x,f9.5,1x,f9.5,1x,i3,1x,i3,
      .                  3x,f9.5)
@@ -13653,7 +13562,7 @@ c
 c-----------------------------------------
 c
 c
-      subroutine wavi2wavk(wav_i,wav_k)
+      subroutine wavi2wavk_(wav_i,wav_k)
       implicit none
 
       real*8 wav_i(_IDIM_) 
@@ -13687,7 +13596,7 @@ c119     format(1x,i2,1x,8f15.8)
 c-----------------------------------------
 c
 c
-      subroutine wavk2wavi(wav_k,wav_i)
+      subroutine wavk2wavi_(wav_k,wav_i)
       implicit none
 
       real*8 wav_k(_KDIM_) 
@@ -13696,16 +13605,562 @@ c
       integer i
       real*8  rk
       real*8  dspline3
+      real*8  dspline3p
+      real*4  proj_k(9)
+      integer k
  
       do i = 1, _IDIM_
          rk = 1 + (_WAVN_-1.0)*
      .            (  i   -_WAVB_)/
      .            (_WAVY_-_WAVB_)
-         wav_i(i) = dspline3(rk,wav_k,_KDIM_)
+         wav_i(i) = dspline3p(rk,wav_k,_KDIM_,proj_k,9)
+         enddo
+
+
+      return
+      end
+
+
+c-----------------------------------------
+c 
+c new subroutine written 2016.05.25
+c
+      subroutine save_wls(wav_kmn,NIT,Ns,LABEL59,MMIN,MMAX)
+      implicit none
+ 
+      real*8 wav_kmn(_KDIM_,_MDIM_,*)
+      integer NIT
+      integer Ns
+      character*59 LABEL59
+      integer MMIN, MMAX
+
+      integer k, m, n
+      character*80 FILENAME
+      
+      FILENAME = trim(LABEL59) // '.00.wls'
+
+      open(17,file=FILENAME,status='unknown')
+      write(06,'(''SAVE_WLS: '',80a)') FILENAME
+      write(17,'(''#'')')
+      write(17,217) (_WAVB_+(k-1.0d0)*(_WAVY_-_WAVB_)/(_WAVN_-1),k=1,9)
+      write(17,'(''#'')')
+      do N = 1, Ns
+         do m = MMIN, MMAX
+            write(17,117) n,m,(wav_kmn(k,m,n),k=1,9)
+            enddo
+         enddo
+      close(17)
+
+  117 format(1x,i4.4,1x,i2.2,1x,9(1x,f10.5))
+  217 format('#',' NIM',1x,' M',1x,9(' i=',f8.3))
+
+      print*,'save_wls...',Ns,MMIN,MMAX,wav_kmn(5,9,1)   
+ 
+      return
+      end
+
+
+c-----------------------------------------
+c 
+c new subroutine written 2016.05.25
+c
+      subroutine read_wls(wav_kmn,wav_imn,FILE_WLS,Ns)
+      implicit none
+
+      real*8 wav_kmn(_KDIM_,_MDIM_,*)
+      real*8 wav_imn(_IDIM_,_MDIM_,*)
+      character(*) FILE_WLS
+      integer Ns
+      
+      character*200 STRING200
+      integer N, M, K
+      real*8 wavk(_KDIM_)
+
+      open(17,file=FILE_WLS,status='old')
+ 317  continue
+      read(17,'(a200)',end=417) STRING200
+      if (STRING200(1:1).eq.'#') goto 317
+      read(STRING200,*) N,M,(wavk(k),k=1,9)
+      if (N.gt.Ns) goto 417
+      if (M.lt. 0001 ) stop 'read_wls:  M.lt.1'
+      if (M.gt._MDIM_) stop 'read_wls:  M.gt._MDIM_'
+      if (N.ne.0) then
+          do k = 1, 9
+             wav_kmn(k,M,N) = wavk(k)
+             enddo
+          call wavk2wavi(wav_kmn(1,M,N),wav_imn(1,M,N))
+         else
+          do N = 1, Ns
+             do k = 1, 9
+                wav_kmn(k,M,N) = wavk(k)
+                enddo
+             call wavk2wavi(wav_kmn(1,M,N),wav_imn(1,M,N))
+             enddo
+         endif
+      goto 317
+ 417  continue
+      close(17)
+      
+      return
+      end
+
+
+
+
+
+c--------------------------------------------
+c
+c
+      subroutine init_wls(wav_kmn,wav_imn,Ns)
+      implicit none
+
+      integer Ns
+      real*8 wav_kmn(_KDIM_,_MDIM_,Ns)
+      real*8 wav_imn(_IDIM_,_MDIM_,Ns)
+     
+      character*255 REFDIR
+      common /REFDIR_/REFDIR
+
+      character*255 FILENAME
+      integer N
+      integer M 
+ 
+      FILENAME = trim(REFDIR) // '/fref/DEFAULT.wls'
+
+      call read_wls(wav_kmn,wav_imn,FILENAME,Ns)
+
+      return
+      end
+
+
+
+c------------------------------------------------------------
+c
+c This is a 5th order spline that rigidly goes through the
+c points and preserves the 1st and 2nd derivatives.  At the
+c ends, it goes through the outermost 6 points and continues.
+c
+c This particular routine will return the projection array
+c that tells you the contribution of each of the contributing
+c 6 points to the spline at the desired location.
+c
+c
+c Here is the matrix that describes the 5th order polynomial
+c coefficients:
+c
+c   |A|        |  0    0   24    0    0    0 | |a| obs_n(n-2)
+c   |B|     1  |  2  -16    0   16   -2    0 | |b| obs_n(n-1)
+c   |C| = ---- | -1   16  -30   16   -1    0 | |c| obs_n(n  )
+c   |D|    24  | -9   39  -70   66  -33    7 | |d| obs_n(n+1)
+c   |E|        | 13  -64  126 -124   61  -12 | |e| obs_n(n+2)
+c   |F|        | -5   25  -50   50  -25    5 | |f| obs_n(n+3)
+c
+c This polynomial formally applies between n and n+1, and
+c the evaluated polynomial is:
+c
+c      fx = x-n
+c 
+c     spline = A 
+c            + B * fx
+c            + C * fx**2
+c            + D * fx**3
+c            + E * fx**4
+c            + F * fx**5
+c
+c When we are within 2 of the end, then let's just go with the
+c 4th order polynomial that fits the last 5 points; it is this
+c polynomial that suppied the zeroth, first, and second derivatives
+c at the point for the spline fit...
+c
+c   |A|        |  -0   0  24   0  -0 | | obs(n-2) |
+c   |B|     1  |   2 -16   0  16  -2 | | obs(n-1) |
+c   |C| = ---- |  -1  16 -30  16  -1 | | obs(n  ) |
+c   |D|    24  |  -2   4  -0  -4   2 | | obs(n+1) |
+c   |E|        |   1  -4   6  -4   1 | | obs(n+2) |
+c
+c
+      real*8 function dspline3p_(rn,o,Ns,p,Ps)
+      implicit none
+ 
+      integer Ns 
+      real*8 rn
+      real*8 o(Ns)
+      real*4 p(*)
+      integer Ps
+
+      real*8 proj6(6)
+
+      integer in
+      integer  n, np
+      real*8 x
+    
+
+      n  = int(rn)
+      in = int(rn)
+
+
+      if (in.le.3.or.in.ge.Ns-2) then
+          if (in.le.   3) n = 3
+          if (in.ge.Ns-2) n = Ns-2
+
+          x = rn-n
+
+          proj6(1) = ( 0   +2*x   -1*x**2   -2*x**3   +1*x**4)/24  ! N - 2
+          proj6(2) = ( 0  -16*x  +16*x**2   +4*x**3   -4*x**4)/24  ! N - 1
+          proj6(3) = (24   +0*x  -30*x**2   -0*x**3   +6*x**4)/24  ! N
+          proj6(4) = ( 0  +16*x  +16*x**2   -4*x**3   -4*x**4)/24  ! N + 1
+          proj6(5) = ( 0   -2*x   -1*x**2   +2*x**3   +1*x**4)/24  ! N + 2
+          proj6(6) = 0.
+
+          dspline3p_= proj6(1)*o(n-2)
+     .              + proj6(2)*o(n-1)
+     .              + proj6(3)*o(n  )
+     .              + proj6(4)*o(n+1)
+     .              + proj6(5)*o(n+2)
+     .              + proj6(6)*o(n+3)
+
+          if (Ps.lt.n+2) return
+
+          do np = 1, Ps
+             p(np) = 0.00
+             enddo
+
+          p(n-2) = proj6(1)
+          p(n-1) = proj6(2)
+          p(n  ) = proj6(3)
+          p(n+1) = proj6(4)
+          p(n+2) = proj6(5)
+          return
+          endif
+
+
+      x = rn-n
+
+      proj6(1) = ( 0   +2*x   -1*x**2   -9*x**3  +13*x**4  -5*x**5)/24  ! N - 2
+      proj6(2) = ( 0  -16*x  +16*x**2  +39*x**3  -64*x**4 +25*x**5)/24  ! N - 1
+      proj6(3) = (24   +0*x  -30*x**2  -70*x**3 +126*x**4 -50*x**5)/24  ! N
+      proj6(4) = ( 0  +16*x  +16*x**2  +66*x**3 -124*x**4 +50*x**5)/24  ! N + 1
+      proj6(5) = ( 0   -2*x   -1*x**2  -33*x**3  +61*x**4 -25*x**5)/24  ! N + 2
+      proj6(6) = ( 0   +0*x   +0*x**2   +7*x**3  -12*x**4  +5*x**5)/24  ! N + 3
+
+      dspline3p_= proj6(1)*o(n-2)
+     .          + proj6(2)*o(n-1)
+     .          + proj6(3)*o(n  )
+     .          + proj6(4)*o(n+1)
+     .          + proj6(5)*o(n+2)
+     .          + proj6(6)*o(n+3)
+
+      if (Ps.lt.n+3) return
+
+      do np = 1, Ps
+         p(np) = 0.00
+         enddo
+      p(n-2) = proj6(1)
+      p(n-1) = proj6(2)
+      p(n  ) = proj6(3)
+      p(n+1) = proj6(4)
+      p(n+2) = proj6(5)
+      p(n+3) = proj6(6)
+
+      return
+      end
+   
+
+
+c------------------------------------------ 
+c
+c this is just a naked call to dspline3p... 
+c it doesn't fill the proj array at all
+c
+      real*8 function dspline3_(rn,o,Ns)
+      integer Ns 
+      real*8 rn
+      real*8 o(Ns)
+
+      real   p(1)
+      real*8 dspline3p
+
+      dspline3 = dspline3p(rn,o,Ns,p,0)
+
+      return
+      end 
+      
+
+
+c------------------------------------------------------------
+c
+c   |A|        |  0    0   24    0    0    0 | |a| obs_n(n-2)
+c   |B|     1  |  2  -16    0   16   -2    0 | |b| obs_n(n-1)
+c   |C| = ---- | -1   16  -30   16   -1    0 | |c| obs_n(n  )
+c   |D|    24  | -9   39  -70   66  -33    7 | |d| obs_n(n+1)
+c   |E|        | 13  -64  126 -124   61  -12 | |e| obs_n(n+2)
+c   |F|        | -5   25  -50   50  -25    5 | |f| obs_n(n+3)
+c
+      real*8 function dspline3hold_(rn,o,Ns)
+      implicit none
+ 
+      integer Ns 
+      real*8 rn
+      real*8 o(Ns)
+
+      real*8 A, B, C, D, E, F ! value times 24 
+
+      integer n
+      real*8 x
+    
+      n = int(rn)
+     
+      if (n.lt.3.or.n.ge.Ns-2) then
+          if (n.lt.   3) n = 3
+          if (n.gt.Ns-2) n = Ns-2
+
+c
+c    1  -0.000000000   0.000000000  24.000000000   0.000000000  -0.000000000
+c    2   2.000000000 -16.000000000   0.000000000  16.000000000  -2.000000000
+c    3  -1.000000000  16.000000000 -30.000000000  16.000000000  -1.000000000
+c    4  -2.000000000   4.000000000  -0.000000000  -4.000000000   2.000000000
+c    5   1.000000000  -4.000000000   6.000000000  -4.000000000   1.000000000
+c
+
+          A =  0*o(n-2) +  0*o(n-1) + 24*o(n) +  0*o(n+1) + 0*o(n+2)
+          B =  2*o(n-2) - 16*o(n-1) +  0*o(n) + 16*o(n+1) - 2*o(n+2)
+          C = -1*o(n-2) + 16*o(n-1) - 30*o(n) + 16*o(n+1) - 1*o(n+2)
+          D = -2*o(n-2) +  4*o(n-1) -  0*o(n) -  4*o(n+1) + 2*o(n+2)
+          E =  1*o(n-2) -  4*o(n-1) +  6*o(n) -  4*o(n+1) + 1*o(n+2)
+
+          x = rn-n
+          dspline3hold_= A/24
+     .                 + B/24*x
+     .                 + C/24*x**2
+     .                 + D/24*x**3
+     .                 + E/24*x**4
+          return
+          endif
+
+      A =  0*o(n-2)+  0*o(n-1)+ 24*o(n)+  0*o(n+1)+  0*o(n+2)+  0*o(n+3)
+      B =  2*o(n-2)- 16*o(n-1)+  0*o(n)+ 16*o(n+1)-  2*o(n+2)+  0*o(n+3)
+      C = -1*o(n-2)+ 16*o(n-1)- 30*o(n)+ 16*o(n+1)-  1*o(n+2)+  0*o(n+3)
+      D = -9*o(n-2)+ 39*o(n-1)- 70*o(n)+ 66*o(n+1)- 33*o(n+2)+  7*o(n+3)
+      E = 13*o(n-2)- 64*o(n-1)+126*o(n)-124*o(n+1)+ 61*o(n+2)- 12*o(n+3)
+      F = -5*o(n-2)+ 25*o(n-1) -50*o(n)+ 50*o(n+1)- 25*o(n+2)+  5*o(n+3)
+ 
+      x = rn-n
+ 
+      dspline3hold_= A/24
+     .             + B/24*x
+     .             + C/24*x**2
+     .             + D/24*x**3
+     .             + E/24*x**4
+     .             + F/24*x**5
+
+      return
+      end
+    
+
+ 
+
+
+c-----------------------------------------
+c
+c
+      subroutine wavi2wavk(wav_i,wav_k)
+      implicit none
+
+      real*8 wav_i(_IDIM_) 
+      real*8 wav_k(_KDIM_) 
+      
+      integer k 
+      real*8  ri
+      integer ii
+      real*8  fi
+      real*8  dspline3
+
+      do k = 1, _KDIM_
+         ri = _WAVB_ + (k-1.0d0)*(_WAVY_-_WAVB_)/(_WAVN_-1)
+         ii = int(ri)
+         fi = ri-ii
+         wav_k(k) = dspline3(ri,wav_i,4021)
          enddo
 
       return
       end
 
-#include "dspline3.f"
 
+
+c-----------------------------------------
+c
+c
+      subroutine wavk2wavi(wav_k,wav_i)
+      implicit none
+
+      real*8 wav_k(_KDIM_) 
+      real*8 wav_i(_IDIM_)
+
+      integer i
+      real*8  rk
+      real*8  dspline3p
+      real*4  proj_k(9)
+      integer k
+
+      do i = 1, _IDIM_
+         rk = 1 + (_WAVN_-1.0)*
+     .            (  i   -_WAVB_)/
+     .            (_WAVY_-_WAVB_)
+         wav_i(i) = dspline3p(rk,wav_k,_KDIM_,proj_k,9)
+         enddo
+
+      return
+      end
+
+
+c------------------------------------------------------------
+c
+c This is a 5th order spline that rigidly goes through the
+c points and preserves the 1st and 2nd derivatives.  At the
+c ends, it goes through the outermost 6 points and continues.
+c
+c This particular routine will return the projection array
+c that tells you the contribution of each of the contributing
+c 6 points to the spline at the desired location.
+c
+c
+c Here is the matrix that describes the 5th order polynomial
+c coefficients:
+c
+c   |A|        |  0    0   24    0    0    0 | |a| obs_n(n-2)
+c   |B|     1  |  2  -16    0   16   -2    0 | |b| obs_n(n-1)
+c   |C| = ---- | -1   16  -30   16   -1    0 | |c| obs_n(n  )
+c   |D|    24  | -9   39  -70   66  -33    7 | |d| obs_n(n+1)
+c   |E|        | 13  -64  126 -124   61  -12 | |e| obs_n(n+2)
+c   |F|        | -5   25  -50   50  -25    5 | |f| obs_n(n+3)
+c
+c This polynomial formally applies between n and n+1, and
+c the evaluated polynomial is:
+c
+c      fx = x-n
+c 
+c     spline = A 
+c            + B * fx
+c            + C * fx**2
+c            + D * fx**3
+c            + E * fx**4
+c            + F * fx**5
+c
+c When we are within 2 of the end, then let's just go with the
+c 4th order polynomial that fits the last 5 points; it is this
+c polynomial that suppied the zeroth, first, and second derivatives
+c at the point for the spline fit...
+c
+c   |A|        |  -0   0  24   0  -0 | | obs(n-2) |
+c   |B|     1  |   2 -16   0  16  -2 | | obs(n-1) |
+c   |C| = ---- |  -1  16 -30  16  -1 | | obs(n  ) |
+c   |D|    24  |  -2   4  -0  -4   2 | | obs(n+1) |
+c   |E|        |   1  -4   6  -4   1 | | obs(n+2) |
+c
+c
+      real*8 function dspline3p(rn,o,Ns,p,Ps)
+      implicit none
+ 
+      integer Ns 
+      real*8 rn
+      real*8 o(Ns)
+      real*4 p(*)
+      integer Ps
+
+      real*8 proj6(6)
+
+      integer in
+      integer  n, np
+      real*8 x
+      integer k
+    
+
+      n  = int(rn)
+      in = int(rn)
+
+
+      if (in.le.3.or.in.ge.Ns-2) then
+          if (in.le.   3) n = 3
+          if (in.ge.Ns-2) n = Ns-2
+
+          x = rn-n
+
+          proj6(1) = ( 0   +2*x   -1*x**2   -2*x**3   +1*x**4)/24  ! N - 2
+          proj6(2) = ( 0  -16*x  +16*x**2   +4*x**3   -4*x**4)/24  ! N - 1
+          proj6(3) = (24   +0*x  -30*x**2   -0*x**3   +6*x**4)/24  ! N
+          proj6(4) = ( 0  +16*x  +16*x**2   -4*x**3   -4*x**4)/24  ! N + 1
+          proj6(5) = ( 0   -2*x   -1*x**2   +2*x**3   +1*x**4)/24  ! N + 2
+          proj6(6) = 0.
+
+          dspline3p = proj6(1)*o(n-2)
+     .              + proj6(2)*o(n-1)
+     .              + proj6(3)*o(n  )
+     .              + proj6(4)*o(n+1)
+     .              + proj6(5)*o(n+2)
+
+          if (Ps.lt.n+2) return
+
+          do np = 1, Ps
+             p(np) = 0.00
+             enddo
+
+          p(n-2) = proj6(1)
+          p(n-1) = proj6(2)
+          p(n  ) = proj6(3)
+          p(n+1) = proj6(4)
+          p(n+2) = proj6(5)
+
+          return
+          endif
+
+      x = rn-n
+
+      proj6(1) = ( 0   +2*x   -1*x**2   -9*x**3  +13*x**4  -5*x**5)/24  ! N - 2
+      proj6(2) = ( 0  -16*x  +16*x**2  +39*x**3  -64*x**4 +25*x**5)/24  ! N - 1
+      proj6(3) = (24   +0*x  -30*x**2  -70*x**3 +126*x**4 -50*x**5)/24  ! N
+      proj6(4) = ( 0  +16*x  +16*x**2  +66*x**3 -124*x**4 +50*x**5)/24  ! N + 1
+      proj6(5) = ( 0   -2*x   -1*x**2  -33*x**3  +61*x**4 -25*x**5)/24  ! N + 2
+      proj6(6) = ( 0   +0*x   +0*x**2   +7*x**3  -12*x**4  +5*x**5)/24  ! N + 3
+
+      dspline3p = proj6(1)*o(n-2)
+     .          + proj6(2)*o(n-1)
+     .          + proj6(3)*o(n  )
+     .          + proj6(4)*o(n+1)
+     .          + proj6(5)*o(n+2)
+     .          + proj6(6)*o(n+3)
+
+      if (Ps.lt.n+3) return
+
+      do np = 1, Ps
+         p(np) = 0.00
+         enddo
+      p(n-2) = proj6(1)
+      p(n-1) = proj6(2)
+      p(n  ) = proj6(3)
+      p(n+1) = proj6(4)
+      p(n+2) = proj6(5)
+      p(n+3) = proj6(6)
+
+      return
+      end
+   
+
+
+c------------------------------------------ 
+c
+c this is just a naked call to dspline3p... 
+c it doesn't fill the proj array at all
+c
+      real*8 function dspline3(rn,o,Ns)
+      integer Ns 
+      real*8 rn
+      real*8 o(Ns)
+
+      real   p(1)
+      real*8 dspline3p
+
+      dspline3 = dspline3p(rn,o,Ns,p,0)
+
+      return
+      end 
+      
