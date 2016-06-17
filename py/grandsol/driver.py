@@ -75,11 +75,15 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
             cmd += " file_wls=%s" % waveguess
         if fixwave:
             cmd += " FIND_WLS-"
+        else:
+            cmd += " FIND_WLS+"
 
         if lsfguess is not None:
             cmd += " file_lsf=%s" % lsfguess
         if fixlsf:
             cmd += " FIND_LSF-"
+        else:
+            cmd += " FIND_LSF+"
              
         if overwrite or not os.path.isfile('order_%02d.done' % o): 
             if ppserver == None:

@@ -464,17 +464,20 @@ def plot_resMAD_byiter(runname, obdf, orders, iters=[1,2,3,4,5,6,7,8,9,10], outf
             print iteration, o, mad
         os.chdir('..')
         
-    #MADarr /= np.mean(MADarr, axis=0)
-    #MADarr -= 1
+    MAD_norm = MADarr - np.mean(MADarr, axis=0)
+    #MAD_norm -= 1
+
+    meanMADs = np.mean(MADarr, axis=0)
     
     fig = pl.figure(figsize=default_size)
+    pl.subplots_adjust(left=0.17, right=0.95)
 
     for i,c in enumerate(colors):
-        pl.plot(iters, MADarr[:,i], 'o-', markersize=10, color=c)
+        pl.plot(iters, MAD_norm[:,i], 'o-', markersize=10, color=c)
 
-    pl.legend(['order %d' % o for o in orders])
+    pl.legend(['order %d, mean(MAD) = %4.4f %%' % (o,meanMADs[i]) for i,o in enumerate(orders)], loc='best', fontsize=14)
     pl.xlabel('iteration')
-    pl.ylabel('MAD of residuals [%]')
+    pl.ylabel('$\\Delta$ MAD of residuals [%]')
             
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
