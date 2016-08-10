@@ -5,7 +5,16 @@ c compile with gfortran:
 c
 c gfortran grand.F -o grand.e
 c
-
+c-----------------------------------------------------------------------
+c
+c Jul 25, 2016 --- Jay
+c
+c * implement an input template
+c * implement the option to output the model; at the moment
+c   it is to an ASCII file, but I could eventually put it
+c   into RDSK ; we may need to make sure this can read in
+c   the same format I output.
+c
 c-----------------------------------------------------------------------
 c
 c May 27, 2016 --- Jay
@@ -416,6 +425,8 @@ c
       integer*1, dimension(:,:,:), allocatable :: uuu_imn
       integer*1, dimension(:,:,:), allocatable :: met_imn
 
+      real*8,    dimension(:,:,:), allocatable :: wav_imn0
+      real*8,    dimension(:,:,:), allocatable :: wav_imnT
 c
 c this is the parametrized LSF; q=1-->13 for nodes
 c
@@ -478,6 +489,8 @@ c
       real    mod1(_IDIM_)
       real    rati(_IDIM_)
       real    sigi(_IDIM_)
+
+      real*8  WMIN, WMAX
  
       real*8  AA,BB,CC,DD,EE
  
@@ -540,8 +553,6 @@ c
       real   ftsi(1 400 001)
       common /ftsw_f__/ftsi
 
-      logical SPEC_FIX
-      data SPEC_FIX/.false./
 
       integer ss
       real    fudge(120001,16)
@@ -560,6 +571,7 @@ c
       character*255 REFDIR
       common /REFDIR_/REFDIR
 
+
       character*80 FILE_LSF
       data FILE_LSF/'NONE'/
 
@@ -574,6 +586,21 @@ c
 
       logical FIRST_FUDGE
       data FIRST_FUDGE/.true./
+
+      logical SIM_MAKE
+      data    SIM_MAKE/.false./
+
+      real    SIM_CNORM
+      data    SIM_CNORM/ 0.00/
+
+      logical SIM_NOISE
+      data    SIM_NOISE/.false./
+
+      character*80 FILE_TEM
+      data         FILE_TEM/'NONE'/
+
+      logical      FIND_TEM
+      data         FIND_TEM/.true./
 
       logical DOFUDGE
       common /DOFUDGE_/DOFUDGE
@@ -625,7 +652,10 @@ c
       real*8 dspline3
 
       real*8 wav_i(_IDIM_)
-
+ 
+      real*8 modtot, modbar
+      real   modval, modnoi
+      real   noise_sig
 
 c------------------------------------------------------------------------------
 c
@@ -638,6 +668,11 @@ c
       NARGs = iargc()
 
       NIT = 0
+ 
+      do n = 1, _NDIM_
+         unim(N) = .true.
+         enddo 
+
 
       if (iargc().lt.3) then
  6001    format(a)
@@ -729,6 +764,18 @@ c
      .     ' a one-digit integer (e.g., mod1)'
          write(6,*) 
          write(6,*) 
+         write(6,6007) 'additional options: '
+         write(6,6007) '   sim_make[+/-]  (add noise to output sim?)'
+         write(6,6007) '   sim_cnorm=X     (norm for output sim)'
+         write(6,6007) '   sim_noise[+/-]  (add noise to output sim?)'
+         write(6,6007) '   file_tem=FILE   (read in a template)'
+         write(6,6007) '   find_tem[+/-]   (solve for the template?)'
+         write(6,6007) '   file_lsf=FILE   (read in an lsf)'
+         write(6,6007) '   find_lsf[+/-]   (solve for the lsf?)'
+         write(6,6007) '   file_wls=FILE   (read in a wls)'
+         write(6,6007) '   find_wls[+/-]   (solve for the wls?)'
+         write(6,*) 
+         write(6,*) 
          stop 'Input valid arguments...'
          endif
 
@@ -757,6 +804,8 @@ c
       allocate(iln(_LDIM_,Ns)) ! line by line pixel index
       allocate(mln(_LDIM_,Ns)) ! line by line order number
 
+      allocate(wav_imn0(_IDIM_,_MDIM_,Ns))
+      allocate(wav_imnT(_IDIM_,_MDIM_,Ns))
 
       call getarg(2,LABEL59)
       call getarg(3,STRING)
@@ -780,8 +829,78 @@ c
       do NARG = 4, NARGs
          call getarg(NARG,STRING)
          write(6,*) 
-         write(6,'(i2.2,1x,a80)') NARG,STRING(1:80) 
+         write(6,'(''ARG# '',i2.2,1x,a80)') NARG,STRING(1:80) 
          write(6,*) 
+         if (STRING(01:9).eq.'SIM_CNORM'.or.
+     .       STRING(01:9).eq.'sim_cnorm') then
+             if (STRING(10:10).ne.'=') then
+                 print*,'  ERROR --- ' 
+                 print*,'  To specify FIND_CNORM on the command line,'
+                 print*,'  you must supply it with either + or - '
+                 print*,'  as a flag.'
+                 print*,' ' 
+                 stop 'Need to specify correctly.'
+                 endif
+             read(STRING(11:80),*) SIM_CNORM
+             write(6,'(''  SIM_CNORM: '',f9.1)') SIM_CNORM
+             goto 77
+             endif
+         if (STRING(01:9).eq.'SIM_NOISE'.or.
+     .       STRING(01:9).eq.'sim_noise') then
+             if (STRING(10:10).ne.'-'.and.
+     .           STRING(10:10).ne.'+') then   
+                 print*,'  ERROR --- ' 
+                 print*,'  To specify SIM_NOISE on the command line,'
+                 print*,'  you must supply it with either + or - '
+                 print*,'  as a flag.'
+                 print*,' ' 
+                 stop 'Need to specify correctly.'
+                 endif
+             if (STRING(10:10).eq.'-') SIM_NOISE = .false.
+             if (STRING(10:10).eq.'+') SIM_NOISE = .true.
+             write(6,'(''  SIM_NOISE: '',l1)') SIM_NOISE
+             goto 77
+             endif
+         if (STRING(01:8).eq.'SIM_MAKE'.or.
+     .       STRING(01:8).eq.'sim_make') then
+             if (STRING(9:9).ne.'-'.and.
+     .           STRING(9:9).ne.'+') then   
+                 print*,'  ERROR --- ' 
+                 print*,'  To specify SIM_MAKE on the command line,'
+                 print*,'  you must supply it with either + or - '
+                 print*,'  as a flag.'
+                 print*,' ' 
+                 stop 'Need to specify correctly.'
+                 endif
+             if (STRING(9:9).eq.'-') SIM_MAKE = .false.
+             if (STRING(9:9).eq.'+') SIM_MAKE = .true.
+             write(6,'(''   SIM_MAKE: '',l1)') SIM_MAKE
+             goto 77
+             endif
+         if (STRING(1:9).eq.'FILE_TEM='.or.
+     .       STRING(1:9).eq.'file_tem=') then
+             FILE_TEM = STRING(10:80)
+             write(6,'(''   FILE_TEM: '',a80)') FILE_TEM
+             FIND_TEM = .false.  
+             write(6,'(''   FIND_TEM: '',l1)') FIND_TEM
+             goto 77
+             endif
+         if (STRING(1:8).eq.'FIND_TEM'.or.
+     .       STRING(1:8).eq.'find_tem') then
+             if (STRING(9:9).ne.'-'.and.
+     .           STRING(9:9).ne.'+') then   
+                 print*,'  ERROR --- ' 
+                 print*,'  To specify FIND_TEM on the command line,'
+                 print*,'  you must supply it with either + or - '
+                 print*,'  as a flag.'
+                 print*,' ' 
+                 stop 'Need to specify correctly.'
+                 endif
+             if (STRING(9:9).eq.'-') FIND_TEM = .false.
+             if (STRING(9:9).eq.'+') FIND_TEM = .true.
+             write(6,'(''   FIND_TEM: '',l1)') FIND_TEM
+             goto 77
+             endif
          if (STRING(1:9).eq.'FILE_LSF='.or.
      .       STRING(1:9).eq.'file_lsf=') then
              FILE_LSF = STRING(10:80)
@@ -791,7 +910,7 @@ c
              goto 77
              endif
          if (STRING(1:8).eq.'FIND_LSF'.or.
-     .       STRING(1:9).eq.'find_lsf') then
+     .       STRING(1:8).eq.'find_lsf') then
              if (STRING(9:9).ne.'-'.and.
      .           STRING(9:9).ne.'+') then   
                  print*,'  ERROR --- ' 
@@ -815,7 +934,7 @@ c
              goto 77
              endif
          if (STRING(1:8).eq.'FIND_WLS'.or.
-     .       STRING(1:9).eq.'find_lsf') then
+     .       STRING(1:9).eq.'find_wls') then
              if (STRING(9:9).ne.'-'.and.
      .           STRING(9:9).ne.'+') then   
                  print*,'  ERROR --- ' 
@@ -929,6 +1048,59 @@ c
   77     continue
          enddo
 
+      if (SIM_MAKE) then
+          write(*,*)
+          write(*,'(''MAKE A SIMULATION... SIM_MAKE = '',l1)') SIM_MAKE
+          write(*,'(''    SIM_CNORM: '',f9.1)') SIM_CNORM
+          write(*,'(''    SIM_NOISE: '',l1  )') SIM_NOISE
+          write(*,'(''     FILE_TEM: '',a80)')  FILE_TEM
+          write(*,'(''     FILE_WLS: '',a80)')  FILE_WLS
+          write(*,'(''     FILE_LSF: '',a80)')  FILE_LSF
+          write(*,'(''         MMIN: '',a80)')  MMIN
+          write(*,'(''         MMAX: '',a80)')  MMAX
+          write(*,*)
+          if (SIM_CNORM.le.0.0001)     stop 'need value for SIM_CNORM'
+          if (FILE_TEM(1:4).eq.'NONE') stop 'need image for FILE_TEM'
+          if (FILE_LSF(1:4).eq.'NONE') stop 'need image for FILE_LSF'
+          if (FILE_WLS(1:4).eq.'NONE') stop 'need image for FILE_WLS'
+ 
+          call read_rjsource_vel(RJSOURCE,z0,Ns)
+          call read_wls(wav_kmn,wav_imn,FILE_WLS,Ns)
+          call read_lsf(lsfqkmn,Ns,FILE_LSF)
+          call read_tem_file(tems,FILE_TEM,'NONE')
+          call fill_mod_imn(mod_imn,wav_imn,lsfqkmn,tems,z0,unim,
+     .                      Ns,MMIN,MMAX)
+          open(37,file='OUTPUT_MODEL.mod',status='unknown')
+          do n = 1, Ns
+             do m = MMIN, MMAX
+                modtot = 0.
+                do i = 0001, _IDIM_
+                   modtot = modtot + mod_imn(i,m,n)
+                   enddo
+                modbar = modtot/(_IDIM_)
+                do i = 0001, _IDIM_
+                   ww = wav_imn(i,m,n)/(1+z0(n))
+                   modval = mod_imn(i,m,n)/modbar*SIM_CNORM
+                   modnoi = sqrt(max(modval,1.0))*noise_sig()
+                   write(37,137) n, m, i, 
+     .                           modval,
+     .                           modval + modnoi,
+     .                           wav_imn(i,m,n),
+     .                           wav_imn(i,m,n)/(1+z0(n)),
+     .                           temw(ww,tems)
+  137              format(1x,i3.3,1x,i2.2,1x,i4.4,
+     .                            3x,f10.2,1x,f10.2,
+     .                            3x,f12.6,1x,f12.6,
+     .                            3x,f12.6)
+                   enddo
+                enddo
+             enddo
+          close(37)
+          print*,' '
+          print*,' '
+          stop 'OUTPUT_MODEL.mod HAS BEEN OUTPUT'
+          endif
+
       write(60,'(/,a)') '# OPTIONAL ARGUMENTS'
       write(60,*)
       write(60,'(2a)')   '      logfile: ', trim(LOGFILE)
@@ -949,7 +1121,11 @@ c
       write(60,'(a,a)')  '  file_lsf: ', FILE_LSF
       write(60,'(a,l1)') '  find_lsf: ', FIND_LSF
       write(60,*)
+      write(60,'(a,a)')  '  file_tem: ', FILE_TEM
+      write(60,'(a,l1)') '  find_tem: ', FIND_TEM
+      write(60,*)
       call flush(60)
+
 
       write(6,'(''#  '')') 
       write(6,'(''# grand.F '')') 
@@ -1009,17 +1185,6 @@ c
             enddo
          enddo
  
-c-------------------------------------------------------
-c
-c
-c     SPEC_FIX = .false.
-c     if (NIT.lt.0) then
-c        NITf = abs(NIT)
-c        NIT = 0
-c        SPEC_FIX = .true.
-c        call read_tem(tems,99)
-c        endif
- 
       write(6,*) '      '
       write(6,*) ' NIT  : ',NIT
       write(6,*) ' LABEL: ',trim(LABEL59)
@@ -1035,12 +1200,22 @@ c        endif
      .              pix_imn,rat_imn,tem_imn,
      .              rej_imn,met_imn,
      .              wav_imn,unim,z0,Ns,MMIN,MMAX)
+  
+      do i = 0001, _IDIM_
+      do m = 0001, _MDIM_
+      do n = 0001,   Ns
+         wav_imn0(i,m,n) = wav_imn(i,m,n)
+         enddo
+         enddo
+         enddo
 
       if (FILE_WLS(1:4).ne.'NONE') then
           write(6,*) ' '
           write(6,*) 'Initialize WLS from file: ',FILE_WLS(1:40)
           write(6,*) ' '
-          call read_wls(wav_kmn,wav_imn,FILE_WLS,Ns)
+          call read_wls(wav_kmn,wav_imnT,FILE_WLS,Ns)
+          if (.not.FIND_WLS)
+     .        call read_wls(wav_kmn,wav_imn ,FILE_WLS,Ns)
           write(6,*) ' '
           write(6,*) '       got WLS from FILE_WLS = ',FILE_WLS(1:40)
           write(6,*) ' '
@@ -1052,6 +1227,37 @@ c        endif
           write(6,*) '       got LSF from FILE_LSF =  ',FILE_LSF(1:40)
           write(6,*) '                    FIND_LSF = ',FIND_LSF
           write(6,*) ' '
+          endif
+
+      if (FILE_TEM(1:4).ne.'NONE') then
+          call read_tem_file(tems,FILE_TEM,LABEL59)
+          write(6,*) ' '
+          write(6,*) '       got TEM from FILE_TEM =  ',FILE_TEM(1:40)
+          write(6,*) '                    FIND_TEM = ',FIND_TEM
+          write(6,*) ' '
+
+          WMIN = 9999.9
+          WMAX =    0.0
+          do i = 0001, _IDIM_
+          do m = MMIN, MMAX
+          do n = 0001,   Ns
+             if (wav_imn0(i,m,n).ge.4000.0) then
+                 if (wav_imn0(i,m,n).gt.WMAX) WMAX = wav_imn0(i,m,n)
+                 if (wav_imn0(i,m,n).lt.WMIN) WMIN = wav_imn0(i,m,n)
+                 endif
+             enddo
+             enddo
+             enddo
+          print*,' ' 
+          print*,'  WMIN: ',WMIN
+          print*,'  WMAX: ',WMAX
+          print*,' ' 
+          print*,'Go through template and nix info outside of this...'
+          do s = 1, _SDIM_
+             ww = ww_r8s(s*1.0d0)
+             if (ww.lt.WMIN) tems(s) = 1.
+             if (ww.gt.WMAX) tems(s) = 1.
+             enddo
           endif
 
       do n = 1, Ns
@@ -1074,54 +1280,53 @@ c that describes the data
 c
 
       BADs = 0
+      open(82,file='LOG.COMPARE.WLS',status='unknown')
       open(15,file='LOG.INITMOD.OUT',status='unknown')
       do n = 1, Ns
          if (.not.unim(n)) goto 445
          do m = MMIN, MMAX
- 
-         write(6,*) 'call find_initmod...'
- 
-         call find_initmod(pix_imn(1,m,n),
-     .                     wav_imn(1,m,n),gopt,dopt,sopt,m,emin,
-     .                     FIND_WLS)
- 
-         write(6,*)
-         write(15,95) n,m,gopt,dopt,sopt,emin
-   95    format(1x,i3,1x,i2,1x,i5,1x,i5,1x,i5,1x,f14.3)
-         write( 6,97) n,m,gopt,dopt,sopt
-   97    format('INITMOD:  n=',i3,' m=',i2,
-     .                   ' g=',i2,' d=',i4,' s=',i4)
-         write(6,*)
-         write(6,98) (k,k=1,9), (k,k=1,9)
-   98    format('   ',2x,' ',3x,' ',2x,' ',2x,1x,2x,1x,
+            write(6,*) 'call find_initmod...'
+            call find_initmod(pix_imn(1,m,n),
+     .                        wav_imn(1,m,n),gopt,dopt,sopt,m,emin,
+     .                        FIND_WLS)
+
+            write(6,*)
+            write(15,95) n,m,gopt,dopt,sopt,emin
+   95       format(1x,i3,1x,i2,1x,i5,1x,i5,1x,i5,1x,f14.3)
+            write( 6,97) n,m,gopt,dopt,sopt
+   97       format('INITMOD:  n=',i3,' m=',i2,
+     .                      ' g=',i2,' d=',i4,' s=',i4)
+            write(6,*)
+            write(6,98) (k,k=1,9), (k,k=1,9)
+   98       format('   ',2x,' ',3x,' ',2x,' ',2x,1x,2x,1x,
      .                      2x,09(3x,i1,3x),
      .                      2x,09(3x,i1,2x))
 
-         if (gopt.eq.43) then
-             BADs = BADs + 1
-             bad_list(BADs) = n
-             endif
+            if (gopt.eq.43) then
+                BADs = BADs + 1
+                bad_list(BADs) = n
+                endif
  
-         do i = 0001, 4021
-            gsn_im(i,m)    = gopt
-            if (.not.SPEC_FIX) tem_imn(i,m,n) = 1.0
-            enddo
+            do i = 0001, 4021
+               gsn_im(i,m)    = gopt
+               if (FIND_TEM) tem_imn(i,m,n) = 1.0
+               enddo
  
 c------------------------------------------------------------
 c
 c take the gaussians derived above and make a fine-scaled LSF
 c
-         if (FILE_LSF(1:4).eq.'NONE') then
-                call gsni2lsfji(gsn_im(1,m),lsfjim(1,1,m))
-             else
-                call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsfjim(1,1,m)) 
-             endif
+            if (FILE_LSF(1:4).eq.'NONE') then
+                   call gsni2lsfji(gsn_im(1,m),lsfjim(1,1,m))
+                else
+                   call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsfjim(1,1,m)) 
+                endif
 
-         call find_ftso(ftso,wav_imn(1,m,n))
-         call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
-         call find_rat0(pix_imn(1,m,n),
-     .                  mod_imn(1,m,n),
-     .                  rat_imn(1,m,n))
+            call find_ftso(ftso,wav_imn(1,m,n))
+            call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
+            call find_rat0(pix_imn(1,m,n),
+     .                     mod_imn(1,m,n),
+     .                     rat_imn(1,m,n))
  
  
 c------------------------------------------------------------
@@ -1135,53 +1340,71 @@ c we reject data points that are too discordant.  This is
 c done each time, so that if a point is removed, it can 
 c be redeemed.
 c
-         done = .false.
-         do NNIT = 1, 99
+            done = .false.
+            do i = 1, 4021
+               wav_i(i) = wav_imn(i,m,n)
+               enddo
 
-            if (FIND_WLS) then
-                call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                          wav_imn(1,m,n),rat_imn(1,m,n),
-     .                          tem_imn(1,m,n),
-     .                          lsfjim(1,1,m),coeffw)
-                call wavi2wavk(wav_imn(1,m,n),
-     .                         wav_kmn(1,m,n))
-                endif
+            do NNIT = 1, 99
 
-            call find_ftso(ftso,wav_imn(1,m,n))
-  
-            if (FILE_LSF(1:4).eq.'NONE') then
-                if (NNIT.le.20) then
-                    call tweak_gsn(pix_imn(1,m,n),rej_imn(1,m,n),
+               if (FIND_WLS) then
+c                  call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
+c    .                             wav_imn(1,m,n),rat_imn(1,m,n),
+c    .                             tem_imn(1,m,n),
+c    .                             lsfjim(1,1,m),coeffw)
+                   call tweak_wls3(pix_imn(1,m,n),rej_imn(1,m,n),
      .                             wav_imn(1,m,n),rat_imn(1,m,n),
-     .                             gsn_im(1,m),lsfjim(1,1,m))
-                    call lsfji2lsfqk(lsfjim(1,1,m),lsfqkmn(1,1,m,n))
-                    endif
-               endif
- 
-            call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
- 
-            call find_tem_snglQ(pix_imn(1,m,n),rej_imn(1,m,n),  ! find a v smooth version of the template 
-     .                          mod_imn(1,m,n),rat_imn(1,m,n),  !      from a single observation
-     .                          tem_imn(1,m,n))
- 
-            nrej = find_locrej(pix_imn(1,m,n),mod_imn(1,m,n),
-     .                         rej_imn(1,m,n),sigi)
+     .                             tem_imn(1,m,n),
+     .                             lsfjim(1,1,m),coeffw)
+                   call wavi2wavk(wav_imn(1,m,n),
+     .                            wav_kmn(1,m,n))
+                   endif
 
-            if (NNIT.lt.10.or.NNIT.eq.NNIT/10*10) 
-     .      write(6,444) 0,n,m,NNIT,nrej,(coeffw(p),p=1,9),
-     .                                   (lsfqkmn(7,k,m,n),k=1,_KDIM_)
-  444       format('NIT',i2.2,':',i3.3,'.',i2.2,'_',i2.2,1x,i2,1x,
-     .                         3x,09(f6.3,1x),
-     .                         3x,09(f5.3,1x))
-            if (.not.FIND_WLS.and.NNIT.ge.05) goto 443
-            enddo!NNIT
- 443        continue
+               call find_ftso(ftso,wav_imn(1,m,n))
+  
+               if (FILE_LSF(1:4).eq.'NONE') then
+                   if (NNIT.le.20) then
+                       call tweak_gsn(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                                wav_imn(1,m,n),rat_imn(1,m,n),
+     .                                gsn_im(1,m),lsfjim(1,1,m))
+                       call lsfji2lsfqk(lsfjim(1,1,m),lsfqkmn(1,1,m,n))
+                       endif
+                  endif
  
-         call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
+               call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
+ 
+               call find_tem_snglQ(pix_imn(1,m,n),rej_imn(1,m,n),  ! find a v smooth version of the template 
+     .                             mod_imn(1,m,n),rat_imn(1,m,n),  !      from a single observation
+     .                             tem_imn(1,m,n))
+ 
+               nrej = find_locrej(pix_imn(1,m,n),mod_imn(1,m,n),
+     .                            rej_imn(1,m,n),sigi)
+
+               if (NNIT.lt.10.or.NNIT.eq.NNIT/10*10) 
+     .         write(6,444) 0,n,m,NNIT,nrej,(coeffw(p),p=1,9),
+     .                                      (lsfqkmn(7,k,m,n),k=1,_KDIM_)
+  444          format('NIT',i2.2,':',i3.3,'.',i2.2,'_',i2.2,1x,i2,1x,
+     .                            3x,09(f6.3,1x),
+     .                            3x,09(f5.3,1x))
+               if (.not.FIND_WLS.and.NNIT.ge.05) goto 443
+               enddo!NNIT
+ 443           continue
+    
+            call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
      .                                 rej_imn(1,m,n))
 
-         enddo!m
- 
+            enddo!m
+
+
+      do i = 0001, 4021
+         write(82,182) i, wav_imn0(i,9,n),     ! average model to start
+     .                    wav_i(i),            ! adjusted model (shift/stretch)
+     .                    wav_imn(i,9,n),      ! optimized fit
+     .                    wav_imnT(i,9,n),     ! truth
+     .                    pix_imn(i,9,n),
+     .                    bar_imn(i,9,n),rej_imn(i,9,n)
+  182    format(1x,i4.4,1x,4f13.6,5x,f9.1,1x,f9.1,1x,i3)
+         enddo
  
 c
 c this routine will compare the current spectrm to the sun,
@@ -1244,6 +1467,7 @@ c
   445    continue! not unim
          enddo!n
          close(15)
+         close(82)
 
 
          if (BADs.ne.0) then
@@ -1278,7 +1502,7 @@ c
 c combine all the velocity-shifted template observations
 c to get our initial estimate of the "average" template.
 c
-      if (.not.SPEC_FIX) then
+      if (FIND_TEM) then
          call make_init_tem(tems,tem_imn,wav_imn,z0,Ns,MMIN,MMAX)
 c        call cnorm_tem(tems,tems,NIT,LABEL59)
          call cnorm_tem_bar(tems,tems,NIT,LABEL59,wav_imn(0501,MMIN,1),
@@ -1313,13 +1537,14 @@ c
      .                 rat_imn,bar_imn,rej_imn,
      .                 unim,NIT,Ns,LABEL59,MMIN,MMAX)
          endif
- 
+
       call find_lines(tems,Ls,sal,sbl,temu,LABEL59)
- 
- 
+
+
+c----------------------------------------------------------- 
 c
-c ok... now that we've completed the first iteration, let's
-c move on and iterate again, this time using least-squares
+c ok... now that we've completed the initial (zeroth) iteration, 
+c let's move on and iterate again, this time using least-squares
 c to determine (a) a more flexible LSF and (b) a better
 c sampled template..
 c
@@ -1399,7 +1624,7 @@ c
 c     sa = r8s_ww(wav_imn(0001,MMIN,1))
 c     sb = r8s_ww(wav_imn(4020,MMAX,1))
 
-      if (.true.) then
+      if (FIND_TEM) then
          call fill_mod_imn(mod_imn,wav_imn,lsfqkmn,tems,z0,unim,
      .                     Ns,MMIN,MMAX)
          call find_twktem(tems,
@@ -1412,7 +1637,7 @@ c     sb = r8s_ww(wav_imn(4020,MMAX,1))
          call smoo_tem(tems,NIT)
          endif 
  
-      if (NIT.le.5.and.(.not.SPEC_FIX)) then
+      if (NIT.le.5.and.FIND_TEM) then
 c        call cnorm_tem(tems,tems,NIT,LABEL59)
          call cnorm_tem_bar(tems,tems,NIT,LABEL59,wav_imn(0501,MMIN,1),
      .                                            wav_imn(3501,MMIN,1))
@@ -4042,7 +4267,6 @@ c------------------------------------------------------
       real    modr
       real*8  wav_rim_frompoly
 
-      print*,'  wavi(0021): ',wavi(0021),wavi(4000)
  
 c
 c Set up the input spectum which will be broadened
@@ -4150,12 +4374,10 @@ c
          if (oo.lt.00001) oo = 00001
          if (oo.gt.40400) oo = 40400
          if (FIND_WLS) then
-           !wavi(i) = wavo(oo) + (ro-oo)*(wavo(oo+1)-wavo(oo))
+            wavi(i) = wavo(oo) + (ro-oo)*(wavo(oo+1)-wavo(oo))
             endif
          enddo
  
-      print*,'  wavi(0021): ',wavi(0021),wavi(4000)
-
       return
       end
  
@@ -5758,10 +5980,68 @@ c
       open(10,file=FILENAME,status='old')
       do s = 00001, _SDIM_
          read(10,*) ss,ww,tems(s)
-         if (s.ne.ss) stop 'SAVE_TEM:  s.ne.ss'
+         if (s.ne.ss) stop 'READ_TEM:  s.ne.ss'
          enddo
       close(10)
  
+      return
+      end
+ 
+ 
+c-----------------------------------------------------------
+c
+c this routine will read in a template into the raw format,
+c which has a particular s-sampling
+c
+c
+      subroutine read_tem_file(tems,FILE_TEM,LABEL59)
+      implicit none
+ 
+      real tems(_SDIM_)
+      character*80 FILE_TEM
+      character*(*) LABEL59
+ 
+      integer       q,qq, Qs
+      real*8        wav0(140001)
+      real*8        tem0(140001)
+      integer       s,ss
+      character*080 FILE11
+      character*200 STRING200
+      real*8        ww
+      real*8        ww_r8s
+      real*8        r8s
+      real*8        q8s
+      real*8        dspline3
+      real          junk
+
+      write(6,'(''READ_TEM_FILE: '',80a)') FILE_TEM
+      open(10,file=FILE_TEM,status='old')
+      q  = 0
+      Qs = 0
+    1 read(10,'(a200)',end=2) STRING200
+      if (STRING200(1:1).eq.'#') goto 1
+      q = q + 1
+      read(STRING200,*) qq, wav0(q), junk, tem0(q)
+      Qs = q
+      if (q.ne.qq) stop 'READ_TEM_FILE:  q.ne.qq'
+      goto 1
+    2 close(10)
+
+      if (LABEL59(1:4).ne.'NONE') then
+          FILE11 = TRIM(LABEL59) // '.input_tem'
+          open(11,file=FILE11,status='unknown')
+          endif
+      do s = 1, _SDIM_
+         r8s = s
+         ww =  ww_r8s(r8s)
+         q8s = 1 + (ww      -wav0(1))/
+     .             (wav0(Qs)-wav0(1))*(Qs-1)
+         tems(s) = dspline3(q8s,tem0,Qs) 
+  111    format(1x,i5.5,3x,f12.7,3x,f9.6)
+         if (LABEL59(1:4).ne.'NONE') write(11,111) s, ww, tems(s)
+         enddo
+      if (LABEL59(1:4).ne.'NONE') close(11)
+
       return
       end
  
@@ -5872,6 +6152,106 @@ c
       end
 
  
+c-------------------------------------------------------------
+c
+c this will read in the data, using the input file provided
+c on the command line
+c
+      subroutine read_rjsource_vel(RJSOURCE,z0,NIMs)
+      implicit none
+ 
+      character*80 RJSOURCE
+      real*8  z0(NIMs)
+      integer NIMs
+ 
+      character*200 STRING
+      character*200 FILEI
+
+c     character*200 FILEU
+      real*8 d, barycorr, vorb, minBC, maxBC
+      real*8 velsys, velorb, velear, velsum         !velocities, m/s
+      real*8 betsys, betorb, betear, betsum         !beta=vel/c
+
+c     integer nrjdir, i1, i2
+
+      integer n, NIM 
+
+      logical DOVORB
+      common /DOVORB_/DOVORB
+
+      NIM = 0
+ 
+      minBC =  99999.0
+      maxBC = -99999.0
+      write(6,'(''READ_RAW: '',200a)') RJSOURCE
+      open(20,file=RJSOURCE,status='old')
+      read(20,'(200a)',end=4) STRING
+      if (STRING(1:8).ne.'VSYST = ') then
+         write(6,*) '                                             '
+         write(6,*) 'The first line in the RJ file                '
+         write(6,*) '                                             '
+         write(6,*) 'has to be VSYST = x , where x is             '
+         write(6,*) 'the systemic velocity in m/s.                '
+         write(6,*) '                                             '
+         write(6,*) '   eg:                                       '
+         write(6,*) '                                             '
+         write(6,*) '  VSYST = -16400 m/s                         '
+         write(6,*) '  00001 "SIGDRA/rj01.46" 185144 4199.221 ... '
+         write(6,*) '  00002 "SIGDRA/rj01.74" 185144 4180.827 ... '
+         write(6,*) '    .                                        '
+         write(6,*) '    .                                        '
+         write(6,*) '    .                                        '
+         write(6,*) '                                             '
+         stop 'VSYST mis specified'
+         endif
+      read(STRING(8:18),*) velsys
+      write(6,'(''---> SYSTEMIC VELOCITY: '',f10.2,'' m/s'')') velsys
+   3  continue
+      read(20,'(200a)',end=4) STRING
+      if (STRING(1:1).eq.'#') goto 3
+      if (STRING(1:6).eq.'METEOR') goto 3
+      if (STRING(1:5).eq.'RJDIR') goto 3
+      if (DOVORB) then
+         read(STRING,*,end=4) n, FILEI,d,barycorr,vorb
+         else
+         read(STRING,*,end=4) n, FILEI,d,barycorr
+         endif
+      if (n.eq.0) stop 'cannot have n=0'
+      if (n.gt.NIM) NIM = n
+      if (NIM.gt.NIMs) stop 'something is messed up... NIM.gt.NIMs'
+      if (NIM.gt._NDIM_) then
+         write(6,*) '                                      '
+         write(6,*) ' The routine is set up to allow only  '
+         write(6,*) ' _NDIM_ = ',_NDIM_,' exposures.       '
+         write(6,*) ' The RJ file has too many.            '
+         write(6,*) '                                      '
+         write(6,*) ' You need to recompile after changing '
+         write(6,*) ' the _NDIM_ parameter in the defaults.'
+         write(6,*) '                                      '
+         stop 'this was a problem'
+         endif
+      if (barycorr.lt.minBC) minBC = barycorr
+      if (barycorr.gt.maxBC) maxBC = barycorr
+
+      velear = -barycorr
+
+      velorb = 0.0
+      if (DOVORB) velorb = vorb
+
+      betsys = velsys / _CMPS_
+      betorb = velorb / _CMPS_
+      betear = velear / _CMPS_
+      betsum = (betsys+betorb+betear + betsys*betorb*betear)
+     .       / (1 + betsys*betorb + betsys*betear + betorb*betear)
+      z0(n) = dsqrt((1+betsum)/(1-betsum)) - 1.0d0
+      velsum = betsum * _CMPS_
+      goto 3
+
+    4 close(20)
+      return
+      end
+
+
 c-------------------------------------------------------------
 c
 c this will read in the data, using the input file provided
@@ -6702,10 +7082,10 @@ c-----------------------------------------------
       integer    i1, i2
       real nrm
  
-      real*8  normal(5,5)
-      real*8  lamron(5,5)
-      real*8  vector(5)
-      real*8  coeffs(5)
+      real*8  normal(9,9)
+      real*8  lamron(9,9)
+      real*8  vector(9)
+      real*8  coeffs(9)
 
       real*8  asum, bsum
       real*8  di_k(9)
@@ -6770,7 +7150,8 @@ c-----------------------------------------------
 
       do i = 0001, _IDIM_
          rn = 1 + 4.*(i-_RATB_)/(_RATY_-_RATB_)
-         call rspline_fp(rn,5,projn_i(1,i),n1,n2)
+         call rspline_fp(rn,9,projn_i(1,i),n1,n2)
+c        di = dspline3(rk,di_k,9) 
          enddo
 
       dsum = 0.
@@ -13474,7 +13855,7 @@ c
      .                       NIMs,MMMM)
       implicit none
  
-      real    tems(_SDIM_)
+      real       tems(_SDIM_)
       real       pix_imn(_IDIM_,_MDIM_,NIMs)
       real       mod_imn(_IDIM_,_MDIM_,NIMs)
       real       rat_imn(_IDIM_,_MDIM_,NIMs)
@@ -14163,4 +14544,237 @@ c
 
       return
       end 
-      
+     
+
+ 
+c
+c original call within GRAND
+c
+c            call tweak_wls(pix_imn(1,m,n),rej_imn(1,m,n),
+c     .                     wav_imn(1,m,n),rat_imn(1,m,n),
+c     .                     tem_imn(1,m,n),
+c     .                     lsfjim(1,1,m),coeffw)
+c
+c            call polyfit_w(wav_imn(1,m,n),
+c     .                     wav_imn(1,m,n),AA,BB,CC,DD,EE)
+c
+
+c-----------------------------------------------
+c
+c
+c
+c
+c-----------------------------------------------
+ 
+      subroutine tweak_wls3(pixi,reji,wavi,nrmi,temi,lsfji,coeffw)
+      implicit none
+ 
+      real   pixi(_IDIM_)
+      integer*1 reji(_IDIM_)
+      real*8 wavi(_IDIM_)
+      real   nrmi(_IDIM_)
+      real   temi(_IDIM_)
+      real   lsfji(_JDIM_,_IDIM_)
+      real   coeffw(5)
+ 
+      real   modo(_ODIM_)
+      real   fxto(_ODIM_)
+ 
+      real*8 wavh(_IDIM_)
+ 
+      real   modx(_IDIM_)
+      real   modi(_IDIM_)
+      real   modl(_IDIM_), modlu
+      integer o
+      real    ri, t, f, ftsw
+      integer ii, j, i, ic
+      real*8  w
+      real    msuma
+      real    msumb
+      real    projn_i(9,_IDIM_)
+      real*8  rn
+      integer n, n1, n2
+      integer    ni, nj
+      integer    i1, i2
+      real nrm
+ 
+      real*8  normal(9,9)
+      real*8  lamron(9,9)
+      real*8  vector(9)
+      real*8  coeffs(9)
+
+      real*8  dspline3u
+      real*8  dspline3p
+      real*8  dinterp3p
+      integer k
+
+      do k = 1, 9
+         coeffs(k) = 0.
+         enddo
+ 
+      do o = 00001, _ODIM_
+         ri = 1 + (o-101)*0.1
+         ii = int(ri)
+         if (ii.lt._IBEG_) ii = _IBEG_
+         if (ii.gt._IEND_) ii = _IEND_
+         w   = wavi(ii) + (ri-ii)*(wavi(ii+1)-wavi(ii))
+         t   = temi(ii) + (ri-ii)*(temi(ii+1)-temi(ii))
+         nrm = nrmi(ii) + (ri-ii)*(nrmi(ii+1)-nrmi(ii))
+         f = ftsw(w)
+         fxto(o) = f*t*nrm
+         enddo
+ 
+ 
+      do o = 00001, _ODIM_
+         i = 1 + (o-101)*0.1
+         if (i.le._IBEG_) i = _IBEG_
+         if (i.ge._IEND_) i = _IEND_
+         modo(o) = 0.
+         do j = -100, 100
+            if (o+j.gt.00001.and.o+j.lt._ODIM_)
+     .      modo(o) = modo(o) + fxto(o+j)*lsfji(101+j,i)
+            enddo
+         enddo
+ 
+      do i = 0001, _IDIM_
+         o = 101 + (i-1)*10
+         modx(i) = (modo(o+1) - modo(o-1))/2
+         modi(i) = modo(o)
+         rn = 1 + 8.*(i-_RATB_)/(_RATY_-_RATB_)
+         call rspline_fp(rn,5,projn_i(1,i),n1,n2)
+         do ni = 1, 9
+            projn_i(ni,i) = 0.0
+            enddo
+         dspline3u = dspline3p(rn,coeffs,9,projn_i(1,i),9)
+c        dspline3u = dinterp3p(rn,coeffs,9,projn_i(1,i),9)
+         enddo
+ 
+      do ni = 1, 9
+      do nj = 1, 9
+         normal(ni,nj) = 0.
+         do i = _RATB_, _RATY_
+            if (reji(i).eq.0)
+     .      normal(ni,nj) = normal(ni,nj) + projn_i(ni,i)*modx(i)
+     .                                     *projn_i(nj,i)*modx(i)
+            enddo
+         enddo
+         enddo
+ 
+      call dinvertNxN(normal,lamron,9,9)
+ 
+      do n = 1, 9
+         vector(n) = 0
+         do i = _RATB_, _RATY_
+            if (reji(i).eq.0)
+     .      vector(n) =
+     .      vector(n) + (pixi(i)-modi(i))*projn_i(n,i)*modx(i)
+            enddo
+         enddo
+ 
+      do n = 1, 9
+         coeffs(n) = 0
+         do nj = 1, 9
+            coeffs(n) = coeffs(n) + lamron(n,nj)*vector(nj)
+            enddo
+         enddo
+ 
+      do i = 0001, _IDIM_
+         modl(i) = 0.
+         do n = 1, 9
+            modl(i) = modl(i) + coeffs(n)*projn_i(n,i)
+            enddo
+         enddo
+ 
+      do i = 0001, _IBEG_
+         wavh(i) = wavi(_IBEG_) + (i-_IBEG_)*(wavi(_IBEG_+1)-
+     .                                        wavi(_IBEG_  ))
+         enddo
+      do i = _IEND_, _IDIM_
+         wavh(i) = wavi(_IEND_) + (i-_IEND_)*(wavi(_IEND_  )-
+     .                                        wavi(_IEND_-1))
+         enddo
+ 
+      do i = _IBEG_, _IEND_
+         ic = i
+         if (ic.lt._IBEG_+1) ic = _IBEG_+1
+         if (ic.gt._IEND_-1) ic = _IEND_-1
+         i1 = ic-1
+         i2 = ic+1
+         modlu = modl(i)
+         if (modlu.gt. 1) modlu =  1
+         if (modlu.lt.-1) modlu = -1
+         wavh(i) = wavi(i) + modlu/06/(i2-i1)*(wavi(i2)-wavi(i1))
+         enddo
+ 
+      do i = 0001, _IDIM_
+         wavi(i) = wavh(i)
+         enddo
+ 
+      do n = 1, 9
+         coeffw(n) = coeffs(n)
+         enddo
+
+      return
+      end
+
+ 
+c------------------------------------------------------------
+c
+      real*8 function dinterp3p(rn,o,Ns,p,Ps)
+      implicit none
+ 
+      integer Ns 
+      real*8 rn
+      real*8 o(Ns)
+      real*4 p(*)
+      integer Ps
+
+      real*8 proj6(6)
+
+      integer in
+      integer  n, np
+      real*8 x
+      integer k
+      real   fn
+
+      n  = int(rn)
+      in = int(rn)
+
+
+      if (in.lt.   1) in = 1
+      if (in.gt.Ns-1) in = Ns-1
+
+      fn = rn-in
+
+      dinterp3p = (1-fn)*o(in)
+     .          + ( fn )*o(in+1)
+
+      do n = 1, Ps
+         p(n) = 0.00
+         enddo
+
+      p(in  ) = 1-fn
+      p(in+1) =  fn
+
+      return
+      end
+
+
+ 
+c
+c this function will return random noise in terms of sigma.  The return value
+c will be between -2 and 2 and will have a gaussian distribution centered about
+c 1 with a sigma of 1  ( exp( (-x**2)/2 ) ) 
+c
+
+      real function noise_sig()
+      implicit none
+
+      real rand
+
+      noise_sig = cos(3.1415927*2*rand(0))*sqrt(-2*log(rand(0)))
+
+      return
+      end
+
+  

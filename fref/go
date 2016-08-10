@@ -1,0 +1,1 @@
+./grand.e "obslist" 'SUNSIM' 9 FUDGE- "FILE_WLS=extract_wavk.00.wls" FIND_WLS- "FILE_TEM=nsosun.tem" tem2 lsf2 mod2 nitf=9
