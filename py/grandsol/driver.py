@@ -72,14 +72,16 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
         else: cmd += " fudge-"
 
         if waveguess is not None:
-            cmd += " file_wls=%s" % waveguess
+            shutil.copy(waveguess, cwd)
+            cmd += " file_wls=%s" % os.path.basename(waveguess)
         if fixwave:
             cmd += " FIND_WLS-"
         else:
             cmd += " FIND_WLS+"
 
         if lsfguess is not None:
-            cmd += " file_lsf=%s" % lsfguess
+            shutil.copy(lsfguess, cwd)
+            cmd += " file_lsf=%s" % os.path.basename(lsfguess)
         if fixlsf:
             cmd += " FIND_LSF-"
         else:

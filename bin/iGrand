@@ -51,6 +51,11 @@ def args():
 
     if opt.obslist != None and opt.truth:
         opt.truthvel = grandsol.io.read_obslist(os.path.abspath(opt.obslist))['vorb']
+
+    if opt.wave is not None:
+        opt.wave = os.path.abspath(opt.wave)
+    if opt.lsf is not None:
+        opt.lsf = os.path.abspath(opt.lsf)
         
     return opt
 
