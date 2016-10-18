@@ -15,42 +15,86 @@ def args():
     Parse command line arguments.
     """
     
-    parser = argparse.ArgumentParser(description='Run iterative Grand Solution doppler analysis.')
-    parser.add_argument(metavar='star',dest='star',action='store',help='Star to analyze.', type=str)
+    parser = argparse.ArgumentParser(
+        description='Run iterative Grand Solution doppler analysis.')
+    parser.add_argument(metavar='star',dest='star',action='store',
+                        help='Star to analyze.', type=str)
     parser.add_argument(metavar='sysvel',dest='sysvel',action='store',
-                        help='Systemic radial velocity of star. This parameter is not needed and ignored if an input obslist is given.',
+                        help='Systemic radial velocity of star.\
+                         This parameter is not needed and ignored\
+                          if an input obslist is given.',
                         nargs='?', default=None, type=float)
-    parser.add_argument('--obslist',dest='obslist',action='store',help='Use existing obslist file instead of creating one from observations found in kbcvel.ascii',
+    parser.add_argument('--obslist',dest='obslist',action='store',
+                        help='Use existing obslist file instead of\
+                         creating one from observations found in kbcvel.ascii',
                         default=None, type=str)
-    parser.add_argument('-o', '--overwrite', dest='overwrite',action='store_true',help='Overwrite previous run [False]',default=False)
-    parser.add_argument('--nofudge', dest='nofudge',action='store_true',help='Do not apply the fudge [False]',default=False)
-    parser.add_argument('--meteor', dest='meteor',action='store',help='Path to meteor file [None]',default=None)
-    parser.add_argument('--orders',dest='orders',action='store',help='List of spectral orders to analyze. [2,3,4,5,6,7,8,9,10]',default=[2,3,4,5,6,7,8,9,10])
-    parser.add_argument('--local', dest='local',action='store_true',help='Run on local computer only. [True]',default=True)
-    parser.add_argument('--ncpus',dest='ncpus',action='store',help='Number of local CPUs to utilize. [autodetect]',default='autodetect')
-    parser.add_argument('--niter',dest='niter',action='store',help='Number of outer loop iterations. [10]',default=10, type=int)
+    parser.add_argument('-o', '--overwrite', dest='overwrite',
+                        action='store_true',
+                        help='Overwrite previous run [False]',default=False)
+    parser.add_argument('--nofudge', dest='nofudge',action='store_true',
+                        help='Do not apply the fudge [False]',default=False)
+    parser.add_argument('--meteor', dest='meteor',action='store',
+                        help='Path to meteor file [None]',default=None)
+    parser.add_argument('--orders',dest='orders',action='store',
+                        help='List of spectral orders to analyze.\
+                         [2,3,4,5,6,7,8,9,10]',default=[2,3,4,5,6,7,8,9,10])
+    parser.add_argument('--local', dest='local',action='store_true',
+                        help='Run on local computer only. [True]',
+                        default=True)
+    parser.add_argument('--ncpus',dest='ncpus',action='store',
+                        help='Number of local CPUs to utilize.\
+                         [autodetect]',default='autodetect')
+    parser.add_argument('--niter',dest='niter',action='store',
+                        help='Number of outer loop iterations. [10]',
+                        default=10, type=int)
     parser.add_argument('--truth', dest='truth',action='store_true',
-                        help='Set this flag if "truth" velocities are given in the input obslist.This will create a few extra plots [False]',
+                        help='Set this flag if "truth" velocities\
+                         are given in the input obslist.This will\
+                          create a few extra plots [False]',
                         default=False)
     parser.add_argument('--phase', dest='phase',action='store',
-                        help="""Plot phase-folded velocities and best-fit orbital model.
-                        Two arguments must follow this flag: period and time of inferior conjunction (i.e. time of transit). [None]""",
-                        default=None, nargs=2, type=float, metavar=('Period','Tc'))
-    parser.add_argument('--plotres', dest='plotres',action='store_true',help='Plot residuals and evolution of residuals (slow). [False]', default=False)
-    parser.add_argument('--plottemp', dest='plottemp',action='store_true',help='Plot template and evolution. [False]', default=False)
-    parser.add_argument('--wave', dest='wave',action='store',help='File containing the initial guess for wavelength solution. [False]', default=None)
-    parser.add_argument('--fixwave', dest='fixwave',action='store_true',help='Fix the wavelength solution? [False]', default=False)
-    parser.add_argument('--lsf', dest='lsf',action='store',help='File containing the initial guess for the LSF. [False]', default=None)
-    parser.add_argument('--fixlsf', dest='fixlsf',action='store_true',help='Fix the LSF? [False]', default=False)
+                        help="""Plot phase-folded velocities\
+                         and best-fit orbital model.
+                        Two arguments must follow this flag:\
+                         period and time of inferior conjunction\
+                          (i.e. time of transit). [None]""",
+                        default=None, nargs=2, type=float,
+                         metavar=('Period','Tc'))
+    parser.add_argument('--plotres', dest='plotres',
+                        action='store_true',
+                        help='Plot residuals and evolution of\
+                         residuals (slow). [False]', default=False)
+    parser.add_argument('--plottemp', dest='plottemp',
+                        action='store_true',
+                        help='Plot template and evolution. [False]',
+                         default=False)
+    parser.add_argument('--wave', dest='wave',action='store',
+                        help='File containing the initial guess\
+                         for wavelength solution.', default=None)
+    parser.add_argument('--fixwave', dest='fixwave',action='store_true',
+                        help='Fix the wavelength solution? [False]',
+                         default=False)
+    parser.add_argument('--lsf', dest='lsf',action='store',
+                        help='File containing the initial guess for the LSF.',
+                        default=None)
+    parser.add_argument('--fixlsf', dest='fixlsf',action='store_true',
+                        help='Fix the LSF? [False]', default=False)
+    parser.add_argument('--tem', dest='tem',action='store',
+                        help='File containing the initial guess\
+                         for the template.', default=None)
+    parser.add_argument('--fixtem', dest='fixtem',action='store_true',
+                        help='Fix the template? [False]', default=False)
 
     
     opt = parser.parse_args()
     if isinstance(opt.orders, str): opt.orders=eval(opt.orders)
-    assert (opt.obslist != None) or (opt.sysvel != None), "Must give either systemic velocity or input obslist."
+    assert (opt.obslist != None) or (opt.sysvel != None),\
+        "Must give either systemic velocity or input obslist."
     opt.fudge = opt.nofudge == False
 
     if opt.obslist != None and opt.truth:
-        opt.truthvel = grandsol.io.read_obslist(os.path.abspath(opt.obslist))['vorb']
+        opt.truthvel = grandsol.io.read_obslist(
+            os.path.abspath(opt.obslist))['vorb']
 
     if opt.wave is not None:
         opt.wave = os.path.abspath(opt.wave)
@@ -69,13 +113,15 @@ if __name__ == '__main__':
     opt = args()
 
     if not opt.local:
-        server = pp.Server(ppservers=("*",), secret='gj3470b', ncpus=opt.ncpus)
+        server = pp.Server(ppservers=("*",),
+                           secret='gj3470b', ncpus=opt.ncpus)
         time.sleep(2)
     elif opt.local:
         server = pp.Server(ncpus=opt.ncpus)
 
     nodes = server.get_active_nodes()
-    print "Active nodes:\nServer                         NCPUS\n-------------------------------------"
+    print "Active nodes:\nServer                         \
+    NCPUS\n-------------------------------------"
     for n in nodes.keys():
         try:
             host = socket.gethostbyaddr(n.split(":")[0])[0]
