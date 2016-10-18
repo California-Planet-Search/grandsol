@@ -136,7 +136,7 @@ pro simobs_one, star, iod, elsf, ech, velsum, ston, file $
   spec = fltarr(npix, nord)
 
 ;Generate a random shoft for all orders.
-  pixsh = 2d0 * (randomu(seed, 1))[0] - 1d0
+  pixsh = 2d0 * (randomu(seed_exit, 1))[0] - 1d0
 
 ;Loop through echelle orders.
   for iord=0, nord-1 do begin
