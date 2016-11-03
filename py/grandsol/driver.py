@@ -5,6 +5,7 @@ import grandsol
 import time
 import pandas as pd
 import numpy as np
+from glob import glob
 
 def execute(cmd, cwd, plotres):
     """
@@ -145,9 +146,24 @@ def run_iterations(opt, ppserver=None):
 
     iterdone = []
     for i in range(opt.niter):
+
         n = i+1
         idir = "iter%02d" % n
-        if not os.path.exists(idir): os.makedirs(idir)
+        if not os.path.exists(idir):
+            os.makedirs(idir)
+
+        # Fix LSF after first iGrand iteration
+        if i > 0:
+            outfname = os.path.join(rundir, 'iter%02d' % i, 'iter%02d_output.lsf' % i)
+            with open(outfname, 'w') as outfile:
+                infiles = sorted(glob(os.path.join('iter%02d' % i, '%s.*.99.lsf' % runname)))
+                for f in infiles:
+                    with open(f, 'r') as infile:
+                        for line in infile:
+                            outfile.write(line)
+            opt.lsf = outfname
+            opt.fixlsf = True
+
 
         if opt.meteor is not None:
             shutil.copy(opt.meteor, os.path.join(idir,"meteor"))
