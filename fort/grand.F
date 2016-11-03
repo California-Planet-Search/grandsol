@@ -5220,22 +5220,38 @@ c
  
       return
       end
- 
- 
+
+
 c--------------------------------------------------------
 c
-c this routine will read in an rdsk file into a pixel
-c    array
+c Read some or all of a 2D echelle spectrum from the
+c specified rdsk file (RDSKFILE) into a 2D array (pix).
+c The filename without the path (FILEI) is used only
+c in diagnostic output.
 c
-      subroutine rdsk(RDSKFILE,pix)
+c The parameters ibeg,mbeg and constants _IDIM_,_MDIM_
+c determine the subset of the spectrum saved in pix:
+c pix = spectrum(ibeg:_IDIM_+ibeg-1, mbeg:_MDIM_+mbeg-1)
+c The first pixel is ibeg=1. The first order is mbeg=1.
+c
+c Bytes are swapped or not, based on a check integer
+c in the dsk file header.
+c
+c Numeric format on disk (I*2,I*4,R*4,R*8) is inferred
+c from a variable type in the dsk file header. Implicit
+c type conversion is used to convert to the data type
+c of the output pix array.
+c
+      subroutine rdsk(RDSKFILE,FILEI,pix,ibeg,mbeg)
       implicit none
- 
-      character*200 RDSKFILE
-      real*8        pix(4021,16)
- 
+
+      character*200 RDSKFILE,FILEI
+      real*8        pix(_IDIM_,_MDIM_)
+      integer       ibeg, mbeg
+
       byte buffb(4)
       integer ios
- 
+
       byte      b4(4)
       character c4(4)
       real      r1
@@ -5243,24 +5259,268 @@ c
       integer*2 i2(2)
       equivalence (c4,b4,r1,i1,i2)
       integer irec
- 
-      integer i,j,n
+
+      integer i,j,m,n
       character*80 FITSFILE
       integer jold
- 
-      integer NMOS
-      character*99999 CHAROUT
-      character*80    CHAR80
-      character*19    CHARDATE
-      integer NCHAR, NCHARs
-      integer NLINE
-      character*80 LOGFILE
-      byte stream(316518)
-      character*10 STRING
 
-      real blaze_abcde_m(5,16)
-      common /blaze_abcde_m_/blaze_abcde_m
-      data blaze_abcde_m /
+      real*8  d1
+      byte    b8(8)
+      equivalence (b8,d1)
+      byte, dimension(:), allocatable :: stream
+      logical swap
+      byte vtyp, ndim, bpe
+      integer recl, idim, mdim, istream, century
+      integer*2 check, clen
+      character*3 vlab
+      character*19 datetime
+      character*255 comment
+
+c Read first 6 bytes (record length, swap check) of dsk file.
+      open(10,file=RDSKFILE,status='old',
+     .     err=900,recl=6,form='UNFORMATTED',
+     .     access='DIRECT')
+      allocate(stream(6))
+      read(10,rec=1,iostat=ios) stream
+      close(10)
+
+c Determine swap from check value (should be 256)
+      b4(1) = stream(5)
+      b4(2) = stream(6)
+      check = i1
+      if (check .eq. 1) then
+        swap = .true.
+      else if (check .eq. 256) then
+        swap = .false.
+      else
+        stop 'file is not in dsk format'
+      end if
+
+c Get record length
+      if (swap) then
+        b4(1) = stream(4)
+        b4(2) = stream(3)
+        b4(3) = stream(2)
+        b4(4) = stream(1)
+      else
+        b4(1) = stream(1)
+        b4(2) = stream(2)
+        b4(3) = stream(3)
+        b4(4) = stream(4)
+      end if
+      recl = i1+8
+      deallocate(stream)
+
+c Read entire first record of dsk file.
+      open(10,file=RDSKFILE,status='old',
+     .     err=900,recl=recl,form='UNFORMATTED',
+     .     access='DIRECT')
+      allocate(stream(recl))
+      read(10,rec=1,iostat=ios) stream
+      close(10)
+
+c Check that end of record trailer matches header.
+      if (stream(recl-3).ne.stream(1) .or.
+     .    stream(recl-2).ne.stream(2) .or.
+     .    stream(recl-1).ne.stream(3) .or.
+     .    stream(recl-0).ne.stream(4)) then
+        write(*,*) 'header :',(stream(i),i=1,4)
+        write(*,*) 'trailer:',(stream(recl-i),i=3,0,-1)
+        stop 'end of record trailer does not match header.'
+      end if
+
+c Get date and time
+      if (stream(7) .ge. 90) then
+        century = 19
+      else
+        century = 20
+      end if
+      write(datetime,'(2i2.2,2("-",i2.2),"T",i2.2,2(":",i2.2))')
+     .  century,(stream(i),i=7,12)
+
+c Get comment length
+      if (swap) then
+        b4(1) = stream(14)
+        b4(2) = stream(13)
+      else
+        b4(1) = stream(13)
+        b4(2) = stream(14)
+      end if
+      clen = i2(1)
+
+c Get comment, if present
+      comment = ''
+      do i=1,clen
+        if (i.eq.1) then
+          comment = char(stream(14+i))
+        else
+          comment = comment(1:i-1) // char(stream(14+i))
+        end if
+      enddo
+
+c Get array dimensions
+      ndim = stream(16+clen)
+      if (ndim.ne.2) then
+        write(*,'(2a)') 'Input file: ', trim(RDSKFILE)
+        stop '- Input file does not contain a 2D array'
+      end if
+      if (swap) then
+        b4(1) = stream(20+clen)
+        b4(2) = stream(19+clen)
+        b4(3) = stream(18+clen)
+        b4(4) = stream(17+clen)
+      else
+        b4(1) = stream(17+clen)
+        b4(2) = stream(18+clen)
+        b4(3) = stream(19+clen)
+        b4(4) = stream(20+clen)
+      end if
+      idim = i1
+      if (_IDIM_+ibeg-1.gt.idim) then
+        write(*,'("_IDIM_=",i4.4,", ibeg=",i4.4,", idim=",i4.4)')
+     .    _IDIM_, ibeg, idim
+        stop 'Last pixel index (_IDIM_+ibeg-1) > Data size (idim)'
+      endif
+      if (swap) then
+        b4(1) = stream(24+clen)
+        b4(2) = stream(23+clen)
+        b4(3) = stream(22+clen)
+        b4(4) = stream(21+clen)
+      else
+        b4(1) = stream(21+clen)
+        b4(2) = stream(22+clen)
+        b4(3) = stream(23+clen)
+        b4(4) = stream(24+clen)
+      end if
+      mdim = i1
+      if (_MDIM_+mbeg-1.gt.mdim) then
+        write(*,'("_MDIM_=",i4.4,", mbeg=",i4.4,", mdim=",i4.4)')
+     .    _MDIM_, mbeg, mdim
+        stop 'Last order index (_MDIM_+mbeg-1) > Data size (mdim)'
+      endif
+
+c Get variable type of stored array (bpe = bits per element).
+      vtyp = stream(15+clen)
+      if (vtyp.eq.2) then
+        vlab = 'I*2'
+        bpe = 2
+      else if (vtyp.eq.3) then
+        vlab = 'I*4'
+        bpe = 4
+      else if (vtyp.eq.4) then
+        vlab = 'R*4'
+        bpe = 4
+      else if (vtyp.eq.5) then
+        vlab = 'R*8'
+        bpe = 8
+      end if
+
+c Check that record is large enough to hold array data
+      if (idim*mdim*bpe.gt.recl-28-clen) then
+        stop ' - Array dimensions larger than record size'
+      endif
+
+c Get array data
+      do m=1,_MDIM_
+        do i=1,_IDIM_
+          istream = 24+clen + ((mbeg+m-2)*idim + ibeg+i-2) * bpe
+          if (swap) then
+            if (bpe.eq.2) then
+              b4(1) = stream(istream+2)
+              b4(2) = stream(istream+1)
+              pix(i,m) = i2(1)         ! I*2 swapped
+            else if (bpe.eq.4) then
+              b4(1) = stream(istream+4)
+              b4(2) = stream(istream+3)
+              b4(3) = stream(istream+2)
+              b4(4) = stream(istream+1)
+              if (vlab.eq.'I*4') then
+                pix(i,m) = i1          ! I*4 swapped
+              else
+                pix(i,m) = r1          ! R*4 swapped
+              end if
+            else
+              b8(1) = stream(istream+8)
+              b8(2) = stream(istream+7)
+              b8(3) = stream(istream+6)
+              b8(4) = stream(istream+5)
+              b8(5) = stream(istream+4)
+              b8(6) = stream(istream+3)
+              b8(7) = stream(istream+2)
+              b8(8) = stream(istream+1)
+              pix(i,m) = d1            ! R*8 swapped
+            end if
+          else
+            if (bpe.eq.2) then
+              b4(1) = stream(istream+1)
+              b4(2) = stream(istream+2)
+              pix(i,m) = i2(1)         ! I*2
+            else if (bpe.eq.4) then
+              b4(1) = stream(istream+1)
+              b4(2) = stream(istream+2)
+              b4(3) = stream(istream+3)
+              b4(4) = stream(istream+4)
+              if (vlab.eq.'I*4') then
+                pix(i,m) = i1          ! I*4
+              else
+                pix(i,m) = r1          ! R*4
+              end if
+            else
+              b8(1) = stream(istream+1)
+              b8(2) = stream(istream+2)
+              b8(3) = stream(istream+3)
+              b8(4) = stream(istream+4)
+              b8(5) = stream(istream+5)
+              b8(6) = stream(istream+6)
+              b8(7) = stream(istream+7)
+              b8(8) = stream(istream+8)
+              pix(i,m) = d1            ! R*8
+            end if
+          end if
+        enddo
+      enddo
+      deallocate(stream)
+
+c Write dsk file information to terminal
+      write(*,'(a11,1x,a3,"[",i4,",",i2,"]",i8,L2,1x,a19,1x,f10.1)')
+     .  FILEI, vlab, idim, mdim, recl, swap, datetime,
+     .  pix(_IDIM_/2,_MDIM_/2)
+      if (clen.gt.0) then
+        write(*,'(2x,a)') comment(1:clen)
+      end if
+
+      return
+
+  900 continue
+      write(6,'(''               '')')
+      write(6,'(''ERROR OPENING  '')')
+      write(6,'(''     RDSKFILE: '',200a)') RDSKFILE
+      write(6,'(''               '')')
+      stop 'error opening file'
+      end
+
+c--------------------------------------------------------
+c
+c Remove an approximate blaze function from observed
+c spectra. Blaze coefficients are based on a B star
+c observation, so the resulting continuum may have
+c a significant slope for cooler stars.
+c
+      subroutine deblaze(INSTRUMENT,pix)
+      implicit none
+
+      character*200 INSTRUMENT
+      real*8        pix(_IDIM_,_MDIM_)
+
+      integer i,m
+      integer nsum
+      real*8  ff, fx
+      real*8  pbar, rbar
+      real*8  psum
+
+      real blaze_hires(5,16)
+      common /blaze_hires_/blaze_hires
+      data blaze_hires /
      .     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,
      .     0.404957, -0.005007, -0.271641,  0.000815,  0.073954,
      .     0.436549, -0.035502, -0.264960,  0.012835,  0.068061,
@@ -5278,201 +5538,110 @@ c
      .     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,
      .     0.000000,  0.000000,  0.000000,  0.000000,  0.000000/
 
-      real*8  ff, fx
-      real*8  pbar, rbar
-      real*8  psum
-      integer nsum
-      integer m
-
-c---------------------------------------------------------------
-c
-c
-c 
-      open(10,file=RDSKFILE,status='old',
-     .     err=900,recl=316518,form='UNFORMATTED',
-     .     access='DIRECT')
- 
-c
-c this line will read in the entire fits file
-c    into long array variable
-c
-      read(10,rec=1,iostat=ios) stream
- 
-      irec = irec/4*4 + 1
-      jold = 0
-      irec = 4*4021*16/4*4 - 8 + 1
-      irec = 1
-   1  continue
-      n = (irec-25)/4 + 1
-      j = (n-1)/4021 + 1
-      i = n - (j-1)*4021
- 
-      b4(1) = stream((irec-1)+1)
-      b4(2) = stream((irec-1)+2)
-      b4(3) = stream((irec-1)+3)
-      b4(4) = stream((irec-1)+4)
-      if (_LINUX_) then
-         b4(1) = stream((irec-1)+4)
-         b4(2) = stream((irec-1)+3)
-         b4(3) = stream((irec-1)+2)
-         b4(4) = stream((irec-1)+1)
-         endif
- 
-      irec = irec + 4
-      if (j.le.00) goto 1
-      if (i.le.00) goto 1
-      if (j.gt.16) goto 2
-      pix(i,j) = r1
-      if (j.ne.jold) then
-         jold = j
-         endif
-      goto 1
-    2 continue
-
+      real blaze_apf(7,16)
+      common /blaze_hires_/blaze_apf
+      data blaze_apf /
+     .     0.999577, -0.043049, -1.093013,  0.100559,  0.374587,
+     .     0.002541,  0.005147,
+     .     0.998065, -0.095357, -1.166149,  0.242618,  0.575754,
+     .    -0.098300, -0.123496,
+     .     0.996592, -0.124048, -1.116592,  0.254979,  0.537689,
+     .    -0.088855, -0.120596,
+     .     0.995973, -0.130179, -1.038512,  0.245867,  0.440884,
+     .    -0.078706, -0.082516,
+     .     0.993070, -0.175697, -1.086329,  0.391032,  0.550425,
+     .    -0.190858, -0.125017,
+     .     0.994151, -0.157364, -1.035178,  0.348416,  0.451898,
+     .    -0.182413, -0.078147,
+     .     0.993487, -0.163843, -1.005322,  0.351064,  0.408006,
+     .    -0.173543, -0.043589,
+     .     0.993155, -0.169819, -1.029457,  0.342576,  0.553941,
+     .    -0.155721, -0.165865,
+     .     0.994109, -0.157794, -1.037168,  0.304713,  0.566582,
+     .    -0.134681, -0.159061,
+     .     0.992954, -0.165630, -0.953130,  0.272542,  0.396387,
+     .    -0.091576, -0.060848,
+     .     0.991076, -0.182809, -0.908578,  0.314654,  0.298667,
+     .    -0.120358,  0.007881,
+     .     0.993132, -0.161569, -0.932786,  0.241287,  0.418127,
+     .    -0.063524, -0.089273,
+     .     0.992971, -0.163930, -0.936989,  0.261586,  0.482521,
+     .    -0.079105, -0.150315,
+     .     0.992954, -0.160715, -0.900496,  0.224140,  0.476949,
+     .    -0.060243, -0.161235,
+     .     0.990510, -0.188754, -0.916225,  0.278536,  0.551372,
+     .    -0.091287, -0.213764,
+     .     0.990889, -0.182064, -0.890163,  0.244837,  0.499474,
+     .    -0.063562, -0.180521/
 
 c
-c do the avarage blaze normalization, as taken
-c from b-stars
+c remove blaze from HIRES spectrum and then normalize mean
 c
-      do m = 02, 13
-         do i = 0001, 4021
+      if (INSTRUMENT(1:5) .eq. 'HIRES') then
+        !write(*,*) 'removing blaze from HIRES spectrum'
+        do m = 02, 13
+          do i = 0001, _IDIM_
             fx = (i-2001.0)/2000.0
-            ff = blaze_abcde_m(1,m)
-     .         + blaze_abcde_m(2,m)*fx
-     .         + blaze_abcde_m(3,m)*fx*fx
-     .         + blaze_abcde_m(4,m)*fx*fx*fx
-     .         + blaze_abcde_m(5,m)*fx*fx*fx*fx
-            ff = ff/blaze_abcde_m(1,m)
+            ff = blaze_hires(1,m)
+     .         + blaze_hires(2,m)*fx
+     .         + blaze_hires(3,m)*fx*fx
+     .         + blaze_hires(4,m)*fx*fx*fx
+     .         + blaze_hires(5,m)*fx*fx*fx*fx
+            ff = ff/blaze_hires(1,m)
             pix(i,m) = pix(i,m)/ff
-            enddo
-         enddo
+          enddo
+        enddo
 
-
-c
 c for simplicity (?) normalize each spectrum
 c to have an average pixel value of 50000
 c between i=501 and i=3501
-c
-      do m = 02, 13
-         psum = 0.0d0
-         nsum = 0
-         do i = 0501, 3501
+        do m = 02, 13
+          psum = 0.0d0
+          nsum = 0
+          do i = 0501, 3501
             psum = psum + pix(i,m)
             nsum = nsum + 1
-            enddo
-         pbar = psum/nsum
-         rbar = pbar/50000
-         do i = 0001, 4021
+          enddo
+          pbar = psum/nsum
+          rbar = pbar/50000
+          do i = 0001, 4021
             pix(i,m) = pix(i,m)/rbar
-            enddo
-         pix(4021,m) = pix(4020,m)
-         enddo
- 
+          enddo
+          pix(4021,m) = pix(4020,m)
+        enddo
+
+c
+c Remove blaze from APF spectrum.
+c Leave normalization of peak (for now).
+c
+      else if (INSTRUMENT(1:3) .eq. 'APF') then
+        !write(*,*) 'removing blaze from HIRES spectrum'
+        do m = 01, _MDIM_
+          do i = 0001, _IDIM_
+            fx = (i-2001.0)/2000.0
+            ff = blaze_apf(1,m)
+     .         + blaze_apf(2,m)*fx
+     .         + blaze_apf(3,m)*fx*fx
+     .         + blaze_apf(4,m)*fx*fx*fx
+     .         + blaze_apf(5,m)*fx*fx*fx*fx
+     .         + blaze_apf(6,m)*fx*fx*fx*fx*fx
+     .         + blaze_apf(7,m)*fx*fx*fx*fx*fx*fx
+            ff = ff/blaze_hires(1,m)
+            pix(i,m) = pix(i,m)/ff
+          enddo
+        enddo
+
+c
+c fail because INSTRUMENT
+c
+      else
+        write(*,*) 'No deblaze coefficients for ' // INSTRUMENT
+        stop '- Unable to deblaze spectrum'
+      end if
+
       return
- 
-  900 continue
-      write(6,'(''               '')')
-      write(6,'(''ERROR OPENING  '')')
-      write(6,'(''     RDSKFILE: '',200a)') RDSKFILE
-      write(6,'(''               '')')
-      stop 'error opening file'
       end
- 
- 
- 
-c--------------------------------------------------------
-c
-c this routine will read in an rdsk file into a pixel
-c    array
-c
-      subroutine rdsk_DP(RDSKFILE,pix)
-      implicit none
- 
-      character*80 RDSKFILE
-      real*8       pix(4021,16)
- 
-      byte buffb(4)
-      integer ios
- 
-      byte      b8(8)
-      character c8(8)
-      real*8    r8
-      integer   i4(2)
-      integer*2 i2(4)
-      equivalence (c8,b8,r8,i4,i2)
-      integer irec
- 
-      integer i,j,n
-      character*80 FITSFILE
-      integer jold
- 
-      integer NMOS
-      integer NARG, NARGs
-      character*99999 CHAROUT
-      character*80    CHAR80
-      character*19    CHARDATE
-      integer NCHAR, NCHARs
-      integer NLINE
-      byte stream(514743)
-      character*10 STRING
- 
-      open(10,file=RDSKFILE,status='old',
-     .     err=900,recl=514743,form='UNFORMATTED',
-     .     access='DIRECT')
- 
- 
-c
-c this line will read in the entire fits file
-c    into one variable
-c
-      read(10,rec=1,iostat=ios) stream
- 
-      irec = irec/4*4 + 1
-      jold = 0
-      irec = 4*4021*16/4*4 - 8 + 1
-      irec = 1
-   1  continue
-      n = (irec-25)/8 + 1
-      j = (n-1)/4021 + 1
-      i = n - (j-1)*4021
- 
-      b8(1) = stream((irec-1)+1)
-      b8(2) = stream((irec-1)+2)
-      b8(3) = stream((irec-1)+3)
-      b8(4) = stream((irec-1)+4)
-      b8(5) = stream((irec-1)+5)
-      b8(6) = stream((irec-1)+6)
-      b8(7) = stream((irec-1)+7)
-      b8(8) = stream((irec-1)+8)
-      if (_LINUX_) then
-         b8(1) = stream((irec-1)+8)
-         b8(2) = stream((irec-1)+7)
-         b8(3) = stream((irec-1)+6)
-         b8(4) = stream((irec-1)+5)
-         b8(5) = stream((irec-1)+4)
-         b8(6) = stream((irec-1)+3)
-         b8(7) = stream((irec-1)+2)
-         b8(8) = stream((irec-1)+1)
-         endif
- 
-      irec = irec + 8
-      if (j.le.00) goto 1
-      if (i.le.00) goto 1
-      if (j.gt.16) goto 2
-      pix(i,j) = r8
-      if (j.ne.jold) then
-         jold = j
-         endif
-      goto 1
-    2 continue
- 
-      return
- 
-  900 continue
-      write(6,*) '---> ERROR: '
-      end
- 
- 
+
 c-------------------------------------------
 c
 c this will convert the parametrized LSF into
@@ -6154,8 +6323,9 @@ c
  
 c-------------------------------------------------------------
 c
-c this will read in the data, using the input file provided
-c on the command line
+c this will read velocities from the obslist file provided
+c on the command line. no spectra are read. this routine is
+c called when generating simulated data.
 c
       subroutine read_rjsource_vel(RJSOURCE,z0,NIMs)
       implicit none
@@ -6289,6 +6459,9 @@ c
  
       integer i, m, n
       character*200 METEORFILE
+      integer ninst
+      character*200 INSTRUMENT
+      integer ibeg, mbeg
 
       logical DOVORB
       common /DOVORB_/DOVORB
@@ -6310,6 +6483,7 @@ c
       nrjdir = 2
 
       METEORFILE = 'NONE'
+      INSTRUMENT = 'HIRES'
  
       minBC =  99999.0
       maxBC = -99999.0
@@ -6364,6 +6538,38 @@ c
          write(6,'(''--->            NRJDIR: '',  i2)') nrjdir
          goto 3
          endif
+
+c Handle instrument specification
+      if (STRING(1:10).eq.'INSTRUMENT') then
+         i1 = 0
+         i2 = 0
+         write(6,*) 'STRING: ',STRING
+         do n = 1, 200
+            if (STRING(n:n).eq.'"'.and.i1.ne.0
+     .                            .and.i2.eq.0) i2 = n-1
+            if (STRING(n:n).eq.'"'.and.i1.eq.0) i1 = n+1
+           !write(6,*) n,STRING(n:n),i1,i2
+            enddo
+         if (i1.eq.0.or.i2.eq.0) then
+            write(6,*) 'tried to assign INSTRUMENT, but failed.'
+            stop 'this was a problem'
+            endif
+         INSTRUMENT = STRING(i1:i2)
+         ninst = i2-i1+1
+         if (INSTRUMENT.eq.'HIRES') then
+           ibeg = 1
+           mbeg = 1
+         else if (INSTRUMENT.eq.'APF') then
+           ibeg = 250 ! 250:4270, (249:4269 in IDL)
+           mbeg = 33  !  33:48  , ( 32:47   in IDL)
+         else
+           stop ' - INSTRUMENT must be HIRES or APF'
+         end if
+         write(6,'("INSTRUMENT=",a,", ibeg=",i4.4,", mbeg=",i2.2)')
+     .     INSTRUMENT(1:ninst), ibeg, mbeg
+         goto 3
+         endif
+
       if (DOVORB) then
          read(STRING,*,end=4) n, FILEI,d,barycorr,vorb
          else
@@ -6445,8 +6651,8 @@ c
 c read in the data from a file; JJ sometimes used DP
 c
       FILEU = RJDIR(1:nrjdir) // FILEI
-      call rdsk(FILEU,pixarray)    ! single precision
-c     call rdsk_DP(FILEU,pixarray) ! double precision
+      call rdsk(FILEU,FILEI,pixarray,ibeg,mbeg)
+      call deblaze(INSTRUMENT,pixarray)
  
 c---------------------------------------------------
 c
@@ -6479,8 +6685,8 @@ c----------------------------------------------------
 c
 c report on what was read in...
 c
-      write(6,'(''RDSK:'',i3.3,1x,a11,1x,15f8.1)')
-     .    n, FILEI(1:11), (pix_imn(2000,m,n),m=MMIN,MMAX)
+      !write(6,'(''RDSK:'',i3.3,1x,a11,1x,15f8.1)')
+      !.    n, FILEI(1:11), (pix_imn(2000,m,n),m=MMIN,MMAX)
       goto 3
  
    4  close(20)
@@ -6497,6 +6703,7 @@ c
       write(60,'(a,sp,f0.2)') 'maxbc: ',maxbc
       write(60,'(2a)') 'obsdir: ',trim(RJDIR)
       write(60,'(2a)') 'obslist_file: ',trim(RJSOURCE)
+      write(60,'(2a)') 'instrument: ',trim(INSTRUMENT)
       write(60,'(2a)') 'meteor_file: ',trim(METEORFILE)
       call flush(60)
 

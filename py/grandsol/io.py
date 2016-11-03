@@ -42,17 +42,18 @@ def read_obslist(infile):
 
     """
     
-    df = pd.read_csv(infile, skiprows=2, sep=' ', skipinitialspace=True, 
+    df = pd.read_csv(infile, skiprows=3, sep=' ', skipinitialspace=True, 
                       names=['ind', 'obs', 'unused', 'bc', 'vorb'])
-    odf = pd.merge(df, kbc, on='obs', suffixes=['','_obl'])
 
+    odf = pd.merge(df, kbc, on='obs', suffixes=['','_obl'])
+    
     if odf.empty:
         odf = df
         odf['jd'] = odf.ind + 15500.   # Hack to fake JD timestamps in simulated data
         
     return odf
 
-def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=False, overwrite=False):
+def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=False, inst="HIRES", overwrite=False):
     """
     Write list of observations in the format that ``grand`` likes.
 
@@ -62,6 +63,7 @@ def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=Fals
         outfile (string): (optional) name of output observation list
         vorb (float scalar or array): (optional) initial velocity guess for each observation
         meteor (bool): Add meteor line to obslist?
+        instrument (string): instrument string in obslist
         overwrite (bool): (optional) overwrite if outfile already exists?
         
     Returns:
@@ -78,7 +80,7 @@ def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=Fals
     odf = df.sort_values('jd').reset_index(drop=True)
     odf['ind'] = odf.index.values + 1
     
-    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\n' % (sysvel, datadir)
+    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\nINSTRUMENT = "%s"\n' % (sysvel, datadir, inst)
     if meteor:
         header += "METEOR meteor\n" 
     body = odf.to_string(index=False, header=False,
