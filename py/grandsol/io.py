@@ -80,7 +80,7 @@ def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=Fals
     odf = df.sort_values('jd').reset_index(drop=True)
     odf['ind'] = odf.index.values + 1
     
-    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\n\nINSTRUMENT="%s"' % (sysvel, datadir, inst)
+    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\nINSTRUMENT="%s"\n' % (sysvel, datadir, inst)
     if meteor:
         header += "METEOR meteor\n" 
     body = odf.to_string(index=False, header=False,
