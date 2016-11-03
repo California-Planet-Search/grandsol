@@ -135,7 +135,7 @@ def run_iterations(opt, ppserver=None):
             if l.startswith('RJDIR'): datadir = l.split('=')[1].strip().replace('"','')
             if l.startswith('VSYST'): opt.sysvel = float(l.split('=')[1].split()[0])
         f.close()
-        df = pd.read_csv(opt.obslist, sep=' ', skipinitialspace=True, skiprows=2, names=['ind', 'obs', 'unused', 'bc', 'vorb'])
+        df = pd.read_csv(opt.obslist, sep=' ', skipinitialspace=True, skiprows=3, names=['ind', 'obs', 'unused', 'bc', 'vorb'])
         df['jd'] = df['ind'] + 15000.
     else:
         df = grandsol.io.get_observations(opt.star)
@@ -162,10 +162,10 @@ def run_iterations(opt, ppserver=None):
         obfile = 'obslist_%02d' % n
         if i == 0:
             vorb = pd.Series(np.zeros_like(df['jd']))
-            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb, meteor=include_meteor)
+            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb, meteor=include_meteor, inst=opt.inst)
         else:
             vorb = vdf['mnvel']
-            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb, meteor=include_meteor)
+            obdf = grandsol.io.write_obslist(df, opt.sysvel, datadir, outfile=obfile, vorb=vorb, meteor=include_meteor, inst=opt.inst)
 
         runorders, joblist = run_orders(runname, obfile, ppserver, orders=runorders, overwrite=opt.overwrite,
                                         fudge=opt.fudge, plotres=opt.plotres, waveguess=opt.wave, fixwave=opt.fixwave,
