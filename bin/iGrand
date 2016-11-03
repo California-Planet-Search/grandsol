@@ -35,6 +35,8 @@ def args():
                         help='Do not apply the fudge [False]',default=False)
     parser.add_argument('--meteor', dest='meteor',action='store',
                         help='Path to meteor file [None]',default=None)
+    parser.add_argument('--inst', dest='inst',action='store',
+                            help='Instrument string [HIRES]',default="HIRES")
     parser.add_argument('--orders',dest='orders',action='store',
                         help='List of spectral orders to analyze.\
                          [2,3,4,5,6,7,8,9,10]',default=[2,3,4,5,6,7,8,9,10])

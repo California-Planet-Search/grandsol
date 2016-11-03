@@ -5,6 +5,7 @@ import grandsol
 import time
 import pandas as pd
 import numpy as np
+from glob import glob
 
 def execute(cmd, cwd, plotres):
     """
@@ -163,7 +164,7 @@ def run_iterations(opt, ppserver=None):
                 opt.sysvel = float(l.split('=')[1].split()[0])
         f.close()
         df = pd.read_csv(opt.obslist, sep=' ',
-                         skipinitialspace=True, skiprows=2,
+                         skipinitialspace=True, skiprows=3,
                          names=['ind', 'obs', 'unused', 'bc', 'vorb'])
         df['jd'] = df['ind'] + 15000.
     else:
@@ -175,9 +176,11 @@ def run_iterations(opt, ppserver=None):
 
     iterdone = []
     for i in range(opt.niter):
+
         n = i+1
         idir = "iter%02d" % n
-        if not os.path.exists(idir): os.makedirs(idir)
+        if not os.path.exists(idir):
+            os.makedirs(idir)
 
         if opt.meteor is not None:
             shutil.copy(opt.meteor, os.path.join(idir,"meteor"))
@@ -191,12 +194,14 @@ def run_iterations(opt, ppserver=None):
             vorb = pd.Series(np.zeros_like(df['jd']))
             obdf = grandsol.io.write_obslist(df, opt.sysvel,
                                              datadir, outfile=obfile,
-                                             vorb=vorb, meteor=include_meteor)
+                                             vorb=vorb, meteor=include_meteorm,
+                                             inst=opt.inst)
         else:
             vorb = vdf['mnvel']
             obdf = grandsol.io.write_obslist(df, opt.sysvel,
                                              datadir, outfile=obfile,
-                                              vorb=vorb, meteor=include_meteor)
+                                             vorb=vorb, meteor=include_meteor,
+                                             inst=opt.inst)
 
         runorders, joblist = run_orders(runname, obfile, ppserver,
                                         orders=runorders,
