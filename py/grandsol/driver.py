@@ -194,7 +194,7 @@ def run_iterations(opt, ppserver=None):
             vorb = pd.Series(np.zeros_like(df['jd']))
             obdf = grandsol.io.write_obslist(df, opt.sysvel,
                                              datadir, outfile=obfile,
-                                             vorb=vorb, meteor=include_meteorm,
+                                             vorb=vorb, meteor=include_meteor,
                                              inst=opt.inst)
         else:
             vorb = vdf['mnvel']
