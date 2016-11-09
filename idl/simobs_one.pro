@@ -19,6 +19,7 @@ pro simobs_one, star, iod, elsf, ech, velsum, ston, file $
 ;
 ;History:
 ; 2012-Oct-23 Valenti Adapted from make_output.pro
+; 2016-Nov-08 Valenti Changed extension for order normalization to .norm3
 
 ;Syntax
   if n_params() lt 7 then begin
@@ -66,7 +67,7 @@ pro simobs_one, star, iod, elsf, ech, velsum, ston, file $
   nord = sz[2]
 
 ;Restore continuum normalization for echelle spectrograph
-  file_norm = dir_ech + ech + '.norm'
+  file_norm = dir_ech + ech + '.norm3'
   if keyword_set(verbose) then print, 'restoring ' + file_norm
   restore, file_norm
   sz = size(norm)
