@@ -5,6 +5,15 @@ c compile with gfortran:
 c
 c gfortran grand.F -o grand.e
 c
+c Dec 02, 2016 --- Jay
+c * This has been modified to re-use the old tweak-shift effort
+c   (tweak_wls2) in the initial stage.
+c * it now works for the B-stars of APF!
+c * it does not yet find the WLS using the template/LSF/etc
+c   still needs to be done
+c * I also fixed a bug in initmod; it used to probe g from 5 to 45 
+c   or so... even though only values up to 25 made sense
+c
 c-----------------------------------------------------------------------
 c
 c Jul 25, 2016 --- Jay
@@ -1200,7 +1209,7 @@ c
      .              pix_imn,rat_imn,tem_imn,
      .              rej_imn,met_imn,
      .              wav_imn,unim,z0,Ns,MMIN,MMAX)
-  
+
       do i = 0001, _IDIM_
       do m = 0001, _MDIM_
       do n = 0001,   Ns
@@ -1216,6 +1225,7 @@ c
           call read_wls(wav_kmn,wav_imnT,FILE_WLS,Ns)
           if (.not.FIND_WLS)
      .        call read_wls(wav_kmn,wav_imn ,FILE_WLS,Ns)
+          call read_wls(wav_kmn,wav_imn,FILE_WLS,Ns)
           write(6,*) ' '
           write(6,*) '       got WLS from FILE_WLS = ',FILE_WLS(1:40)
           write(6,*) ' '
@@ -1272,7 +1282,7 @@ c
       write(60,'(2a)') 'GRAND_REFDIR: ', trim(REFDIR)
       write(60,'(/,a)') '# REFERENCE FILES'
       call flush(60)
- 
+
 c-------------------------------------------------------
 c
 c initial iteration, find the rough model template + LSF
@@ -1285,6 +1295,7 @@ c
       do n = 1, Ns
          if (.not.unim(n)) goto 445
          do m = MMIN, MMAX
+
             write(6,*) 'call find_initmod...'
             call find_initmod(pix_imn(1,m,n),
      .                        wav_imn(1,m,n),gopt,dopt,sopt,m,emin,
@@ -1327,7 +1338,21 @@ c
             call find_rat0(pix_imn(1,m,n),
      .                     mod_imn(1,m,n),
      .                     rat_imn(1,m,n))
- 
+
+c           if (.true.) then
+c               call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
+c    .                                        rej_imn(1,m,n))
+c               do i = 0001, 4021
+c                  write(57,157) i, pix_imn(i,m,n), mod_imn(i,m,n), 
+c    .                              rat_imn(i,m,n), bar_imn(i,m,n),
+c    .                              wav_imn(i,m,n), rej_imn(i,m,n)
+c 157              format(1x,i4.4,1x,f8.1,1x,f8.1,
+c    .                            1x,f8.5,1x,f8.1,
+c    .                            1x,f12.6,1x,i1)
+c                  enddo 
+c               close(57)
+c               print*,'close(57)'
+c               endif
  
 c------------------------------------------------------------
 c
@@ -1348,14 +1373,14 @@ c
             do NNIT = 1, 99
 
                if (FIND_WLS) then
-c                  call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
-c    .                             wav_imn(1,m,n),rat_imn(1,m,n),
-c    .                             tem_imn(1,m,n),
-c    .                             lsfjim(1,1,m),coeffw)
-                   call tweak_wls3(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                             wav_imn(1,m,n),rat_imn(1,m,n),
-     .                             tem_imn(1,m,n),
-     .                             lsfjim(1,1,m),coeffw)
+                  call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                            wav_imn(1,m,n),rat_imn(1,m,n),
+     .                            tem_imn(1,m,n),
+     .                            lsfjim(1,1,m),coeffw)
+c                   call tweak_wls3(pix_imn(1,m,n),rej_imn(1,m,n),
+c     .                             wav_imn(1,m,n),rat_imn(1,m,n),
+c     .                             tem_imn(1,m,n),
+c     .                             lsfjim(1,1,m),coeffw)
                    call wavi2wavk(wav_imn(1,m,n),
      .                            wav_kmn(1,m,n))
                    endif
@@ -1392,19 +1417,16 @@ c    .                             lsfjim(1,1,m),coeffw)
     
             call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
      .                                 rej_imn(1,m,n))
-
+c           do i = 0001, 4021
+c              write(58,157) i, pix_imn(i,m,n), mod_imn(i,m,n), 
+c    .                          rat_imn(i,m,n), bar_imn(i,m,n),
+c    .                          wav_imn(i,m,n), rej_imn(i,m,n)
+c 158          format(1x,i4.4,1x,f8.1,1x,f8.1,
+c    .                        1x,f8.5,1x,f8.1,
+c    .                        1x,f12.6,1x,i1)
+c              enddo
             enddo!m
 
-
-      do i = 0001, 4021
-         write(82,182) i, wav_imn0(i,9,n),     ! average model to start
-     .                    wav_i(i),            ! adjusted model (shift/stretch)
-     .                    wav_imn(i,9,n),      ! optimized fit
-     .                    wav_imnT(i,9,n),     ! truth
-     .                    pix_imn(i,9,n),
-     .                    bar_imn(i,9,n),rej_imn(i,9,n)
-  182    format(1x,i4.4,1x,4f13.6,5x,f9.1,1x,f9.1,1x,i3)
-         enddo
  
 c
 c this routine will compare the current spectrm to the sun,
@@ -1468,7 +1490,6 @@ c
          enddo!n
          close(15)
          close(82)
-
 
          if (BADs.ne.0) then
              write(6,*) ' '
@@ -4263,6 +4284,7 @@ c------------------------------------------------------
       real*8  wavo(40401)
       real    ftso(40401), ftsw
       real    modo(40401)
+      real    modo_g(40401,25)
       real    e
       integer g, d, s
       integer o, oo
@@ -4275,8 +4297,9 @@ c------------------------------------------------------
       integer gmin, dmin, smin
       real    modr
       real*8  wav_rim_frompoly
-
- 
+      real    bar
+      real*8  wavq(4021), f
+      real*8  wavk(9)
 c
 c Set up the input spectum which will be broadened
 c by the LSF and possibly shifted or stretched
@@ -4288,9 +4311,19 @@ c
          if (ii.lt.0001) ii = 0001
          if (ii.gt.4020) ii = 4020
          wavo(o) = wavi(ii) + (ri-ii)*(wavi(ii+1)-wavi(ii))
-         wavo(o) = wav_rim_frompoly(ri,m)
          ftso(o) = ftsw(wavo(o))
          enddo
+
+c     if (.false.) then
+c        do i = 0001+3, 4020-3
+c           o = 101 + (i-1)*10
+c           bar = 0.
+c           do oo = o-30, o+30
+c              bar = bar + ftso(oo)/61
+c              enddo 
+c           write(55,155) i, o, pixi(i), ftso(o), bar, wavi(i)
+c           enddo
+c        endif
  
       emin = 9e9
  
@@ -4303,7 +4336,7 @@ c need the offset/slope to 0.3 pixel.... for now.  This will
 c be improved in the next stage.  We just need to get close
 c enough to find the minimum with least squares.
 c
-      do g =   03, 43, 05
+      do g = 03, 25, 02
          do o = 00001, 40401
             modo(o) = 0.
             do oo = max(00001,o-100), min(40401,o+100)
@@ -4356,7 +4389,6 @@ c
                   e = e + abs(pixi(i+ii)-ratu*modo(o+ii*10))
                   enddo
                enddo!i
-  129       format(1x,i2,1x,i3,1x,i3,1x,f12.2,1x,i1)
             if (e.lt.emin) then
                emin = e
                smin = s
@@ -4386,6 +4418,96 @@ c
             wavi(i) = wavo(oo) + (ro-oo)*(wavo(oo+1)-wavo(oo))
             endif
          enddo
+
+
+c      if (false.) then
+c         print*,'---> gopt: ',gopt
+c         print*,'---> sopt: ',sopt
+c         print*,'---> dopt: ',dopt
+c         do o = 00001, 40401
+c            ri = 1 + (o-101)*0.1
+c            ii = int(ri)
+c            if (ii.lt.0001) ii = 0001
+c            if (ii.gt.4020) ii = 4020
+c            wavo(o) = wavi(ii) + (ri-ii)*(wavi(ii+1)-wavi(ii))
+c            ftso(o) = ftsw(wavo(o))
+c            enddo
+c
+c        do i = 0001+3, 4020-3
+c           o = 101 + (i-1)*10
+c           bar = 0.
+c           do oo = o-30, o+30
+c              bar = bar + ftso(oo)/61
+c              enddo 
+c           write(56,155) i, o, pixi(i), ftso(o), bar, wavi(i)
+c 155       format(1x,i4.4,1x,i5.5,1x,f8.1,1x,f8.1,1x,f8.1,1x,f12.6)
+c           enddo
+c
+c         print*,'modo_g...'
+c         do g = 1, 25
+c            do o = 00001, 40401
+c               modo_g(o,g) = 0.
+c               do oo = max(00001,o-100), min(40401,o+100)
+c                  modo_g(o,g) = modo_g(o,g)
+c     .                        + ftso(oo)*lsfj_gg(101+oo-o,g,g)
+c                  enddo
+c               enddo
+c            enddo
+c
+c         print*,'output 59...'
+c         do ii = 0021, 4000, 1
+c            gmin = 0
+c            dmin = 0
+c            emin = 9e9
+c            do g = 1, 25
+c               do d = -50, 50
+c                  e = 0.
+c                  psum = 0.
+c                  msum = 0.
+c                  do i = ii-20, ii+20
+c                     o = 101 + (i-1)*10 + d
+c                     psum = psum + pixi(i)
+c                     msum = msum + modo_g(o,g)
+c                     enddo
+c                  ratu = psum/msum
+c                  do i = ii-20, ii+20
+c                     o = 101 + (i-1)*10 + d
+c                     e = e + abs(pixi(i)-ratu*modo_g(o,g))
+c                     enddo!i
+c                  if (e.lt.emin) then
+c                      emin = e
+c                      dmin = d
+c                      gmin = g
+c                      endif
+c                  enddo
+c               enddo
+c            oo = 101 + (ii-1)*10 + dmin
+c            write(59,159) ii,dmin,gmin,emin,ratu,
+c     .                       pixi(ii),modo_g(oo,gmin),
+c     .                       wavi(ii), wavo(oo)
+c  159       format(1x,i4.4,1x,i3,1x,i3,1x,f9.1,1x,f8.5,
+c     .             1x,f8.1,1x,f8.1,1x,f12.6,1x,f12.6)
+c            wavq(ii) = wavo(oo)
+c            enddo
+c
+c         do k = 1, 9
+c            if (k.eq.1) ri =   21.00
+c            if (k.eq.2) ri =  518.375 
+c            if (k.eq.3) ri = 1015.750 
+c            if (k.eq.4) ri = 1513.125 
+c            if (k.eq.5) ri = 2010.500 
+c            if (k.eq.6) ri = 2507.875 
+c            if (k.eq.7) ri = 3005.250 
+c            if (k.eq.8) ri = 3502.625 
+c            if (k.eq.9) ri = 4000.000
+c            i = int(ri)
+c            f = ri-i
+c            wavk(k) = (1-f)*wavq(i) + f*wavq(i+1)
+c            enddo    
+c
+c        write(69,169) (wavk(k),k=1,9)
+c 169    format(3x,9f12.6) 
+c        endif
  
       return
       end
@@ -4744,6 +4866,9 @@ c
       real    r, ruse
       real lsfa(201)
       real lsfb(201)
+
+      if (gu.gt.25.or.ggu.gt.25) 
+     .    stop 'gu or ggu .gt. 50'
  
       if (first_call) then
          do g1 = 1, 25
