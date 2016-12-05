@@ -1470,28 +1470,28 @@ c
          close(82)
 
 
-c$$$         if (BADs.ne.0) then
-c$$$             write(6,*) ' '
-c$$$             write(6,*) 'There were serious problems with the following'
-c$$$             write(6,*) 'observations.  Perhaps they are templates?'
-c$$$             write(6,*) ' '
-c$$$             do BAD = 1, BADs
-c$$$                write(6,'(i4,1x,i4)') BAD, bad_list(BAD)
-c$$$                enddo
-c$$$             write(6,*) ' '
-c$$$             open(91,file=RJSOURCE,status='unknown')
-c$$$    3        read(91,'(80a)',end=4) STRING
-c$$$             if (STRING(1:1).ge.'0'.and.STRING(1:1).le.'9') then
-c$$$                read(STRING,*) N,FILENAME
-c$$$                do BAD = 1, BADs
-c$$$                   if (n.eq.bad_list(BAD)) write(*,*) STRING
-c$$$                   enddo
-c$$$                endif
-c$$$             goto 3
-c$$$    4        close(91)
-c$$$             write(6,*) ' '
-c$$$             stop 'Cannot continue; bad observation'
-c$$$             endif
+         if (BADs.ne.0) then
+             write(6,*) ' '
+             write(6,*) 'There were serious problems with the following'
+             write(6,*) 'observations.  Perhaps they are templates?'
+             write(6,*) ' '
+             do BAD = 1, BADs
+                write(6,'(i4,1x,i4)') BAD, bad_list(BAD)
+                enddo
+             write(6,*) ' '
+             open(91,file=RJSOURCE,status='unknown')
+    3        read(91,'(80a)',end=4) STRING
+             if (STRING(1:1).ge.'0'.and.STRING(1:1).le.'9') then
+                read(STRING,*) N,FILENAME
+                do BAD = 1, BADs
+                   if (n.eq.bad_list(BAD)) write(*,*) STRING
+                   enddo
+                endif
+             goto 3
+    4        close(91)
+             write(6,*) ' '
+             stop 'Cannot continue; bad observation'
+             endif
 
       write(6,'(''wav_imn(21,09,001): '',f15.8)') wav_imn(21,09,001)
 
@@ -4303,7 +4303,7 @@ c need the offset/slope to 0.3 pixel.... for now.  This will
 c be improved in the next stage.  We just need to get close
 c enough to find the minimum with least squares.
 c
-      do g =   03,  43, 05
+      do g =   03, 43, 05
          do o = 00001, 40401
             modo(o) = 0.
             do oo = max(00001,o-100), min(40401,o+100)

@@ -20,7 +20,7 @@ def get_observations(star, thin=999):
         
     """
     
-    star = kbc[(kbc['name'].str.upper() == star.upper()) & (kbc['type'] == 'o') & kbc.obs.str.startswith('rj')]
+    star = kbc[(kbc['name'].str.upper() == star.upper()) & (kbc['type'] == 'o') & ~kbc.obs.str.startswith('rk')]
 
     if len(star.obs.values) > thin:
         np.random.seed(0)

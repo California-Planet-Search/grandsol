@@ -79,7 +79,7 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
     good_orders = []
     for o in orders:
         cwd = os.getcwd()
-        cmd = "grand %s %s %d 121111 out=%s.%02d.log vorb+ nitf=10" \
+        cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ nitf=5" \
           % (obslist, runname, o, runname, o)
 
         if fudge: cmd += " fudge+"
