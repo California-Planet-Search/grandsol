@@ -3699,14 +3699,23 @@ c
       character*255 FILENAME255
       character*255 REFDIR
       common /REFDIR_/REFDIR
+
+      character*200 INSTRUMENT
+      common /INSTRUMENT_/INSTRUMENT
  
       logical start
       common /start__/start
       data start/.true./
  
       if (start) then
-         FILENAME255 = trim(REFDIR) // 
-     .                '/kecknso52p5.sam'
+         if (INSTRUMENT(1:5) .eq. 'HIRES') then
+            FILENAME255 = trim(REFDIR) // '/kecknso52p5.sam'
+         else if (INSTRUMENT(1:3) .eq. 'APF') then
+            FILENAME255 = trim(REFDIR) // '/apfiodine.sam'
+         else
+            write(*,*) 'No iodine spectrum for ' // INSTRUMENT(1:20)
+            stop
+         end if
          write(6,*) '     REFDIR: ',REFDIR
          write(6,*) '       TRIM: ',TRIM(REFDIR)
          write(6,*) 'FILENAME255: ',FILENAME255
@@ -6460,8 +6469,10 @@ c
       integer i, m, n
       character*200 METEORFILE
       integer ninst
-      character*200 INSTRUMENT
       integer ibeg, mbeg
+
+      character*200 INSTRUMENT
+      common /INSTRUMENT_/INSTRUMENT
 
       logical DOVORB
       common /DOVORB_/DOVORB
