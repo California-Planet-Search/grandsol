@@ -21,6 +21,8 @@ c size of the supersampled LSF
         integer o_min, m_min, k_min
         integer o_max, m_max, k_max
 
+        character*512 line
+
 61      format(a)
 62      format(2x,a,t25,a)
 63      format(2x,a,t25,a,i2,a)
@@ -112,7 +114,9 @@ c size of the supersampled LSF
             write(*,'(''#   o   m k     j     dj    lsf_j '')')
             write(*,'(''# .... .. .    ... ...... ........'')')
             write(*,'(''# '')')
-    1       read(10,*,end=2) o,m,k,(lsfq(q),q=1,_QDIM_)
+    1       read(10,'(A)',end=2) line
+            if (line(1:1) .eq. '#') goto 1
+            read(line,*) o,m,k,(lsfq(q),q=1,_QDIM_)
             call lsfq2lsfj(lsfq,lsfj)
             if ((oin.eq.o.or.oin.eq.0).and.
      .          (min.eq.m.or.min.eq.0).and.
