@@ -168,7 +168,7 @@ def run_iterations(opt, ppserver=None):
                          names=['ind', 'obs', 'unused', 'bc', 'vorb'])
         df['jd'] = df['ind'] + 15000.
     else:
-        df = grandsol.io.get_observations(opt.star)
+        df = grandsol.io.get_observations(opt.star, thin=opt.thin)
         datadir = os.environ['GRAND_DATADIR']
     runname = "iGrand_" + opt.star
     rundir = os.getcwd()

@@ -591,6 +591,7 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
 
         cmd = [grlsf_binary, lsffile, str(iobs), str(order), '0']
 
+        print ' '.join(cmd)
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         lsfdf = grandsol.io.read_grlsf(p.stdout)
