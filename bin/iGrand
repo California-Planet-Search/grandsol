@@ -111,7 +111,7 @@ def args():
         os.environ['GRAND_KBCVEL'] = os.environ['GRAND_ABCVEL']
         os.environ['GRAND_RAWDIR'] = os.environ['GRAND_RAWDIR_APF']
         os.environ['GRAND_DATADIR'] = os.environ['GRAND_DATADIR_APF']
-        if opt.wave is not None:
+        if opt.wave is None:
             opt.wave = os.path.join(os.environ['GRAND_REFDIR'], 'apf_crop.wls_FIX')
         
     return opt
