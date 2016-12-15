@@ -161,7 +161,7 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
 
     legendlabels = ["order %d $\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(orders,sigmas)] + ['Mean $\sigma=%.2f$' % grandsol.utils.MAD(vdf['mnvel'])]
     
-    pl.legend(plist, legendlabels, loc='best')
+    pl.legend(plist, legendlabels, loc='best', fontsize=12)
     pl.title(runname + " orders")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
@@ -275,7 +275,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
 
     legendlabels = ["iteration %d\n$\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(iters,sigmas)]
     
-    pl.legend(legendlabels, loc='best')
+    pl.legend(legendlabels, loc='best', fontsize=12)
     pl.title(runname + " iterations")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
