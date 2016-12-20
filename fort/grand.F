@@ -666,6 +666,9 @@ c
       real   modval, modnoi
       real   noise_sig
 
+      character*200 INSTRUMENT
+      common /INSTRUMENT_/INSTRUMENT
+
 c------------------------------------------------------------------------------
 c
       call getenv("GRAND_REFDIR", REFDIR)
@@ -1448,8 +1451,13 @@ c
                      fudge(s,m) = 0.000
                      enddo
                   enddo
-               FILENAME255 = trim(REFDIR) // 
-     .                       '/BSTAR_CORRECTION.2012.10.23'
+               FILENAME255 = 'NONE'
+               if (INSTRUMENT(1:5).eq.'HIRES')
+     .             FILENAME255 = trim(REFDIR) // 
+     .                        '/BSTAR_CORRECTION.2012.10.23'
+               if (INSTRUMENT(1:3).eq.'APF')
+     .             FILENAME255 = 'BSTAR_CORRECTION.2016.12.19_APF'
+               if (FILENAME255(1:4).eq.'NONE') stop 'BAD FUDGE'
                open(19,file=FILENAME255,status='old')
                write(60,'(2a)'), 'fudge_file: ',trim(FILENAME255)
                do s = 000001, 120001
