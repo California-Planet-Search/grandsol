@@ -1,5 +1,12 @@
 
+c
+c 2017.01.17 
+c * change the domain over which the WLS nodes are solved for
+c   so that perhaps the WLS will be able to better accomodate
+c   the variation of the LSF
+c
 
+c-----------------------------------------------------------------------
 c
 c compile with gfortran:
 c
@@ -453,7 +460,9 @@ c
  
       real    lsfj(_JDIM_),lsfju           ! local fine-sam LSF
       real    lsfjim(_JDIM_,_IDIM_,_MDIM_) ! fine-sam LSF for this exposure
- 
+
+      real    lsf_ji(_JDIM_,_IDIM_)         ! fine-sam LSF for this exposure/order
+      real    lsf_qk(_QDIM_,_KDIM_) 
  
 c----------------------------------------------
 c
@@ -528,6 +537,9 @@ c just a summary of fits that were made
 c
       real    coeffw(9)
       data    coeffw/0.,0.,0.,0.,0.,0.,0.,0.,0./ 
+
+      real    coeffw_k(9)
+      real    coeffw_t(9)
  
       integer p
       real*8  psum, pbar, ssum, sbar, xsum
@@ -668,6 +680,13 @@ c
 
       character*200 INSTRUMENT
       common /INSTRUMENT_/INSTRUMENT
+
+
+      real lsf_q0(13)
+      real lsf_j0(201)
+      real lsf_jS(201)
+      real lsf_qS(13)
+      real dx, dx_k(09)
 
 c------------------------------------------------------------------------------
 c
@@ -825,6 +844,9 @@ c
       read(STRING,*) MMIN
       MMAX = MMIN
 
+      write(FILENAME,'(2a,i2.2,a)') trim(LABEL59),'.',mmin,'.wls_lsf'
+      open(78,file=FILENAME,status='unknown')
+
       write(FILENAME,'(2a,i2.2,a)') trim(LABEL59),'.',mmin,'.par'
       open(60,file=FILENAME,status='unknown')
       write(60,'(a)') '# REQUIRED ARGUMENTS'
@@ -976,7 +998,9 @@ c
      .       STRING(1:4).eq.'OUT='.or.
      .       STRING(1:8).eq.'LOGFILE=') then
              read(STRING(index(STRING,'=')+1:80),*) LOGFILE
+             print*,'---> open   LOGFILE...'
              open(6,file=LOGFILE,status='unknown')
+             print*,'---> opened LOGFILE...'
              goto 77
              endif
          if (STRING(1:6).eq.'FUDGE+'.or.
@@ -1058,6 +1082,7 @@ c
          write(*,*)
          stop 'Rework the command-line argument'
   77     continue
+         print*,'---> next argument...'
          enddo
 
       if (SIM_MAKE) then
@@ -1240,6 +1265,41 @@ c
           write(6,*) '       got LSF from FILE_LSF =  ',FILE_LSF(1:40)
           write(6,*) '                    FIND_LSF = ',FIND_LSF
           write(6,*) ' '
+c
+c
+c-----------------------------------------------------------
+c
+c
+          m = 5
+          n = 1
+          do k = 1, 9
+             do q = 01, 13
+                lsf_q0(q) = lsfqkmn(q,k,m,n)
+                enddo
+             call lsfq2lsfj(lsf_q0,lsf_j0)
+             call lsfj2symm(lsf_j0,lsf_jS,dx)
+             write(*,'(''# DX: '',f8.4,i4,1x,13f8.4)') 
+     .                     dx/10.0,k, (lsf_q0(q),q=1,13)
+             do j = 001, 201
+                write(81,281) k, j, lsf_j0(j), lsf_jS(j)
+  281           format(1x,i11x,i3.3,1x,f10.5,1x,f10.5)
+                enddo
+             call lsfj2lsfq(lsf_jS,lsf_qS)
+             write(*,'(''# DX: '',f8.4,i4,1x,13f8.4)') 
+     .                     dx/10.,k, (lsf_qS(q),q=1,13)
+             write(*,'(''# DX: '',f8.4,i4,1x,13f8.4)') 
+     .                     dx/10.,k, (lsf_qS(q)-lsf_q0(q),q=1,13)
+             dx_k(k) = dx/10.0
+             print*,' '
+             enddo!k
+          write(*,'(i3.3,1x,i2.2,2x,9f8.4)') n,m,(dx_k(k),k=1,9)
+          print*,' '
+          STOP 'check out file fort.81...'                      
+c
+c
+c-----------------------------------------------------------
+c
+c
           endif
 
       if (FILE_TEM(1:4).ne.'NONE') then
@@ -1373,6 +1433,7 @@ c
                wav_i(i) = wav_imn(i,m,n)
                enddo
 
+
             do NNIT = 1, 99
 
                if (FIND_WLS) then
@@ -1400,7 +1461,7 @@ c     .                             lsfjim(1,1,m),coeffw)
                   endif
  
                call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
- 
+
                call find_tem_snglQ(pix_imn(1,m,n),rej_imn(1,m,n),  ! find a v smooth version of the template 
      .                             mod_imn(1,m,n),rat_imn(1,m,n),  !      from a single observation
      .                             tem_imn(1,m,n))
@@ -1420,17 +1481,18 @@ c     .                             lsfjim(1,1,m),coeffw)
     
             call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
      .                                 rej_imn(1,m,n))
+
 c           do i = 0001, 4021
-c              write(58,157) i, pix_imn(i,m,n), mod_imn(i,m,n), 
+c              write(58,158) i, pix_imn(i,m,n), mod_imn(i,m,n), 
 c    .                          rat_imn(i,m,n), bar_imn(i,m,n),
 c    .                          wav_imn(i,m,n), rej_imn(i,m,n)
 c 158          format(1x,i4.4,1x,f8.1,1x,f8.1,
 c    .                        1x,f8.5,1x,f8.1,
 c    .                        1x,f12.6,1x,i1)
 c              enddo
+
             enddo!m
 
- 
 c
 c this routine will compare the current spectrm to the sun,
 c line-center by line-center, and will shift report the
@@ -1456,8 +1518,7 @@ c
      .             FILENAME255 = trim(REFDIR) // 
      .                        '/BSTAR_CORRECTION.2012.10.23'
                if (INSTRUMENT(1:3).eq.'APF')
-     .             FILENAME255 = trim(REFDIR) // 
-     .                        '/BSTAR_CORRECTION.2016.12.19_APF'
+     .             FILENAME255 = 'BSTAR_CORRECTION.2016.12.19_APF'
                if (FILENAME255(1:4).eq.'NONE') stop 'BAD FUDGE'
                open(19,file=FILENAME255,status='old')
                write(60,'(2a)'), 'fudge_file: ',trim(FILENAME255)
@@ -1752,6 +1813,51 @@ c
       call info_nim(pix_imn,mod_imn,wav_imn,
      .              rat_imn,bar_imn,rej_imn,
      .              unim,NIT,Ns,LABEL59,MMIN,MMAX)
+
+      if (.true.) then
+          print*,' '
+          do N = 1, Ns
+          do m = MMIN, MMAX
+             call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsf_ji)
+             do k = 1, 9
+                do q = 01, 13
+                   lsf_qk(q,k) = lsfqkmn(q,k,m,n)
+                   enddo
+                call lsfq2lsfj(lsf_qk(1,k),lsf_j0)
+                call lsfj2symm(lsf_j0,lsf_jS,dx)
+                call lsfj2lsfq(lsf_jS,lsf_qk(1,k))
+                dx_k(k) = dx/10.0
+                enddo
+c            write(77,'(i2,1x,i3.3,1x,i2.2,2x,9f8.4)') 
+c    .                  NIT,n,m,(dx_k(k),k=1,9)
+             call lsfqk2lsfji(lsf_qk,lsf_ji)
+             do k = 1, 9
+                coeffw_t(k) = 0.
+                enddo
+             do NNIT = 1, 100
+                call tweak_wls4(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                          wav_imn(1,m,n),rat_imn(1,m,n),
+     .                          tems,lsf_ji,coeffw_k,z0(n),
+     .                          N,NIT,NNIT)
+                call wavi2wavk(wav_imn(1,m,n),wav_kmn(1,m,n))
+                call wavk2wavi(wav_kmn(1,m,n),wav_imn(1,m,n))
+                do k = 1, 9
+                   coeffw_t(k) = coeffw_t(k) + coeffw_k(k)
+                   enddo
+                enddo
+             write( *,113) NIT,N,M,(coeffw_t(k),k=1,9),
+     .                             (dx_k(k),k=1,9)
+             write(78,113) NIT,N,M,(coeffw_t(k),k=1,9),
+     .                             (dx_k(k),k=1,9),
+     .                              wav_kmn(1,m,n)
+  113        format(1x,i2.2,1x,i3.3,1x,i2.2,1x,
+     .                      4x,9(f5.3,1x),
+     .                      4x,9(f5.3,1x),
+     .                      4x,f12.6)
+             enddo
+             enddo
+          print*,' '
+          endif
  
       NIT = NIT + 1
       if (NIT.le.NITf) goto 777
@@ -1798,7 +1904,7 @@ c
       write(60,'(a,L1)') '_LINUX_: ', _LINUX_
       close(60)
  
-      stop 'successful completion of program'
+      STOP 'successful completion of program'
       end
  
  
@@ -5639,7 +5745,10 @@ c Write dsk file information to terminal
       write(6,'(''ERROR OPENING  '')')
       write(6,'(''     RDSKFILE: '',200a)') RDSKFILE
       write(6,'(''               '')')
-      stop 'error opening file'
+      print*,' ' 
+      print*,'RDSKFILE: ',RDSKFILE
+      print*,' ' 
+      stop 'error opening RDSKFILE'
       end
 
 c--------------------------------------------------------
@@ -15129,4 +15238,251 @@ c
       return
       end
 
+ 
+
+cc-------------------------------------------------------------
+cc
+cc 2016.11.22 --- added by Jay
+cc * this is the set of routine that will take a current
+cc   model and tweak the WLS 
+cc * at presnet, it is just for diagnostic purposes, but
+cc   perhaps it will be implemented sometime
+cc 
+cc
+c      if (.true.) then 
+c          print*,' '
+c          print*,'check out the WLS...  can it be improved?'
+c          print*,' '
+c          do n = 1, Ns
+c             do i = 0001, 4021
+c                pixi_(i) = pix_imn(i,MMIN,n)
+c                wavi_(i) = wav_imn(i,MMIN,n)
+c                modi_(i) = mod_imn(i,MMIN,n)
+c                bari_(i) = bar_imn(i,MMIN,n)
+c                rati_(i) = rat_imn(i,MMIN,n)
+c                reji_(i) = rej_imn(i,MMIN,n)
+c                meti_(i) = rej_imn(i,MMIN,n)
+c                enddo
+c             call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsfji_) 
+c             call find_rati_bar_lsq(pixi_,modi_,bari_,rati_,reji_,meti_)
+c             call tweak_wlsG(pixi_,reji_,wavi_,rati_,
+c     .                       tems,lsfji_,coeffw,z0(n),
+c     .                       wav_imnT(1,MMIN,n))
+c             write(*,'(i3.3,1x,9f12.3)') n, (coeffw(i),i=1,9)
+c             enddo 
+c         STOP 'how did it work?'
+c         endif 
+c 
+ 
+
+c--------------------------------------------------------------------
+c
+c 2016.09.06 --- designed to tweak the wls given an LSF and template
+c 2016.11.22 --- added this option to solve for the WLS given the
+c                current template and current LSF
+c 2017.01.17 --- change the range over which the WLS is solve for to
+c                just the local region, not overlapping regions that
+c                are 2x that
+c
+      subroutine tweak_wls4(pixi,reji,wavi,rati,
+     .                      tems,lsfji,coeffw_k,z0,N,NIT,NNIT)
+      implicit none
+ 
+      real*4    pixi(_IDIM_)
+      integer*1 reji(_IDIM_)
+      real*8    wavi(_IDIM_)
+      real*4    rati(_IDIM_)
+      real*4    tems(_SDIM_)         ! current template
+      real*4    lsfji(_JDIM_,_IDIM_)
+      real*4    coeffw_k(9)
+      real*8    z0
+      integer   N, NIT, NNIT
+
+      real   modo(_ODIM_)
+      real   fxto(_ODIM_)
+ 
+      real*8 wavh(_IDIM_)
+ 
+      integer o, oo
+      real    t, f, ftsw
+      integer ii, j, i, ic
+      real*8  w
+      real    msuma
+      real    msumb
+      integer i1, i2
+ 
+      integer k
+      real    rato
+
+      integer k1, k2
+      real*8  psum, msum
+      real    ratu
+      real    dmod
+      real    dsumM, dsum0, dsumP
+      real    dwav
+      real    ri
+      real    rk
+      integer ik
+      real    fk
+      real    ck
+
+      call find_fxto(fxto,wavi,z0,tems)    ! fxto is the super sam x10
+
+      do o = 00001, _ODIM_
+         ri = 1 + (o-101)*0.1
+         ii = int(ri)
+         if (ii.lt._IBEG_) ii = _IBEG_
+         if (ii.gt._IEND_) ii = _IEND_
+         rato = rati(ii) + (ri-ii)*(rati(ii+1)-rati(ii))
+         rato = 1.0
+         modo(o) = 0.
+         do j = -100, 100
+            if (o+j.gt.00001.and.o+j.lt._ODIM_)
+     .      modo(o) = modo(o) + rato*fxto(o+j)*lsfji(101+j,ii)
+            enddo
+         enddo
+
+      do k = 1, 9
+         i1 = max(_RATB_, int(_RATB_ + (k-1-0.50)*(_RATY_-_RATB_)/8.))
+         i2 = min(_RATY_, int(_RATB_ + (k-1+0.50)*(_RATY_-_RATB_)/8.))
+         dsumM = 0.  ! shift -0.1*o
+         dsum0 = 0.  ! no shifts
+         dsumP = 0.  ! shift +0.1*o
+         do i = i1, i2
+            psum  = 0.
+            msum  = 0.
+            do ii = i-5, i+5
+               oo = 101 + (ii-1)*10
+               if (reji(ii).eq.0) then
+                  psum = psum + pixi(ii)
+                  msum = msum + modo(oo)
+                  endif
+               enddo
+            o = 101 + (i-1)*10
+            ratu  = psum/msum
+            dmod  = 0.1*(modo(o+1)-modo(o-1))/2.0
+            dsumM = dsumM + abs(pixi(i)-(modo(o)-dmod)*ratu)
+            dsum0 = dsum0 + abs(pixi(i)-(modo(o)     )*ratu)
+            dsumP = dsumP + abs(pixi(i)-(modo(o)+dmod)*ratu)
+            enddo
+         coeffw_k(k) = 0.00
+         if (dsumM.lt.dsum0.and.dsumM.lt.dsumP) coeffw_k(k) = -0.005
+         if (dsumP.lt.dsum0.and.dsumP.lt.dsumM) coeffw_k(k) =  0.005
+         enddo
+
+      dwav = (wavi(_IEND_)-wavi(_IBEG_))/((_IEND_)-(_IBEG_))
+
+      do i = 0001, _IDIM_
+         rk = 1 + 8.*(i-_RATB_)/(_RATY_-_RATB_)
+         if (rk.lt.1.000) rk = 1.000
+         if (rk.gt.8.999) rk = 8.999
+         ik = int(rk)
+         fk = rk-ik
+         ck = coeffw_k(ik) + fk*(coeffw_k(ik+1)-coeffw_k(ik))
+         wavh(i) = wavi(i) + ck*dwav
+         enddo
+ 
+      do i = 0001, _IDIM_
+         wavi(i) = wavh(i)
+         enddo
+
+      return
+      end
+
+
+
+
+      subroutine temi2tems(temi,wavi,tems)
+      implicit none
+
+      real*4 temi(_IDIM_)
+      real*8 wavi(_IDIM_)
+      real*4 tems(_SDIM_)
+
+      integer i
+      real*8  w1, w2, ws
+      integer s, s1, s2
+      real*8  ww_r8s
+      real*8  r8s_ww
+
+      do s = 00001, _SDIM_
+         tems(s) = 0.
+         enddo
+
+      do i = 0001, 4020
+         w1 = wavi(i)
+         w2 = wavi(i+1)
+         s1 = int(r8s_ww(w1))
+         s2 = int(r8s_ww(w2))
+         do s = s1, s2
+            ws = ww_r8s(s*1.0d0)
+            tems(s) = temi(i) + (ws-w1)/(w2-w1)*(temi(i+1)-temi(i))
+            enddo
+         enddo
+ 
+      do s = 00001, _SDIM_
+         write(53,153) s, tems(s), ww_r8s(s*1.0d0)
+  153    format(1x,i6.6,1x,f10.4,1x,f12.6)
+         enddo
   
+      return
+      end
+
+
+      subroutine lsfj2symm(lsf_j0,lsf_jS,dx)
+      implicit none
+
+      real    lsf_j0(201)
+      real    lsf_jS(201)
+      real    dx
+
+      real*8  lsfa(201)
+      real*8  lsfb(201)
+      real*8  lsfu(201)
+      real*8  dspline
+      real*8  dcen
+
+      integer j
+      integer idx
+      real*8  emin
+      integer imin
+      real*8  esum
+
+      do j = 001, 201
+         lsfa(j) = lsf_j0(j)
+         enddo
+
+      do j = 101, 200
+         if (lsfa(j).le.0) lsfa(j+1) = 0.
+         enddo
+
+      do j = 101, 000, -1
+         if (lsfa(j).le.0) lsfa(j-1) = 0.
+         enddo
+
+      emin = 9e9
+      do idx = -10000, 10000, 10
+         dcen = idx*0.001
+         do j = 001, 201
+            lsfb(j) = dspline(j+dcen,lsfa,201)
+            enddo
+         esum = 0.
+         do j = 001, 100
+            esum = esum + abs(lsfb(j)-lsfb(202-j))
+            enddo
+         if (esum.lt.emin) then
+             emin = esum
+             imin = idx
+             do j = 001, 201
+                lsfu(j) = lsfb(j)
+                enddo
+             endif
+         enddo
+
+      dx = imin*0.001
+      do j = 001, 201
+         lsf_Js(j) = lsfu(j)
+        enddo
+
+      return
+      end
