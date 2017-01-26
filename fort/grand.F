@@ -1518,7 +1518,8 @@ c
      .             FILENAME255 = trim(REFDIR) // 
      .                        '/BSTAR_CORRECTION.2012.10.23'
                if (INSTRUMENT(1:3).eq.'APF')
-     .             FILENAME255 = 'BSTAR_CORRECTION.2016.12.19_APF'
+     .             FILENAME255 = trim(REFDIR) // 
+     .                        '/BSTAR_CORRECTION.2016.12.19_APF'
                if (FILENAME255(1:4).eq.'NONE') stop 'BAD FUDGE'
                open(19,file=FILENAME255,status='old')
                write(60,'(2a)'), 'fudge_file: ',trim(FILENAME255)
