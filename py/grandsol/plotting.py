@@ -224,7 +224,7 @@ def truthplot(runname, truthvel, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=N
     else: pl.savefig(outfile)
 
 
-def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None, binsize=2.0):
     """
 
     Plot the RV time-series for ``iGrand`` iterations.
@@ -237,7 +237,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
         will be displayed in an interactive window.
 
     Returns:
-        None
+        DataFrame: DataFrame with velocities from all orders combined
 
     """
 
@@ -260,6 +260,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
             
         try:
             vdf = grandsol.io.combine_orders(runname, obdf, orders)
+            vdf_nobin = vdf.copy()
             diff = np.sum(((vdf['mnvel'] - prev) / vdf['errvel'])**2)
             prev = vdf['mnvel']
             #print i, diff
@@ -267,6 +268,16 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
             print "WARNING: Could not read velocities for iteration %d" % i
             continue
 
+        if binsize > 0.0:
+            bintimes, binvels, binerr = grandsol.utils.timebin(vdf['jd'].values,
+                                                               vdf['mnvel'].values,
+                                                               vdf['errvel'].values,
+                                                               binsize=binsize)
+            vdf = pd.DataFrame([])
+            vdf['jd'] = bintimes
+            vdf['mnvel'] = binvels
+            vdf['errvel'] = binerr
+            
         velplot_mean(vdf, fmt='s', color=colors[i-1])
         #sigmas.append(np.std(vdf['mnvel']))
         sigmas.append(grandsol.utils.MAD(vdf['mnvel']))
@@ -279,6 +290,8 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
     pl.title(runname + " iterations")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
+
+    return vdf_nobin
 
 def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
     """

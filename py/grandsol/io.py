@@ -5,7 +5,21 @@ from scipy.constants import c
 import grandsol.relativity as relativity
 import grandsol
 
-kbc = pd.read_csv(os.environ['GRAND_KBCVEL'], sep=' ', skiprows=1, skip_blank_lines=True, skipinitialspace=True, names=['obs', 'name', 'bc', 'jd', 'ha', 'type'])
+def load_bc(bcfile):
+    """
+    Load kbcvel.ascii or abcvel.ascci and return as
+    Pandas DataFrame.
+
+    Args:
+        kbcfile (string): name of bary file
+
+    Return:
+        DataFrame
+    """
+    
+    kbc = pd.read_csv(bcfile, sep=' ', skiprows=1, skip_blank_lines=True, skipinitialspace=True, names=['obs', 'name', 'bc', 'jd', 'ha', 'type'])
+
+    return kbc
 
 def get_observations(star, thin=999):
     """
@@ -19,6 +33,8 @@ def get_observations(star, thin=999):
        DataFrame containing the rows in $GRAND_KBCVEL corresponding to the requested star
         
     """
+    bcfile = os.environ['GRAND_KBCVEL']
+    kbc = load_bc(bcfile)
     
     star = kbc[(kbc['name'].str.upper() == star.upper()) & (kbc['type'] == 'o') & ~kbc.obs.str.startswith('rk')]
 
@@ -45,6 +61,8 @@ def read_obslist(infile):
     df = pd.read_csv(infile, skiprows=3, sep=' ', skipinitialspace=True, 
                       names=['ind', 'obs', 'unused', 'bc', 'vorb'])
 
+    baryfile = os.environ['GRAND_KBCVEL']
+    kbc = load_bc(baryfile)
     odf = pd.merge(df, kbc, on='obs', suffixes=['','_obl'])
     
     if odf.empty:
@@ -259,5 +277,21 @@ def read_truth(tfile):
 
     df = pd.read_csv(tfile, sep=' ', skipinitialspace=True, comment='#', names=['waveleng', 'temp*iod', 'noise', 'norm_vec', 'obs_spec'])
 
-    return df 
+    return df
+
+def write_velocities(df, outfile):
+    """
+    Write velocities to a file
+
+    Args:
+        df (DataFrame): DataFrame output from `grandsol.io.combine_orders`
+        outfile (string): Name of output file
+
+    """
+
+    colmap = {'bc_x': 'bc'}
+    for old,new in colmap.items():
+        df[new] = df[old]
+        
+    df.to_csv(outfile, sep=' ', columns=['obs', 'jd', 'mnvel', 'errvel', 'bc'], index=False)
 

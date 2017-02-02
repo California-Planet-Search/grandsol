@@ -231,10 +231,14 @@ def run_iterations(opt, ppserver=None):
         os.chdir(rundir)
         
         if len(joblist) > 0 or n == opt.niter:
-            grandsol.plotting.velplot_by_iter(runname,
+            vdf = grandsol.plotting.velplot_by_iter(runname,
                                               runorders,
                                               outfile='iGrand_%s_velbyiter.pdf'\
                                                % opt.star, iters=iterdone)
+            grandsol.io.write_velocities(vdf,
+                                         outfile='iGrand_%s_iter%02d_velocities.txt'\
+                                         % (opt.star, n))
+
             if opt.truth:
                 grandsol.plotting.truthplot(runname,
                                             opt.truthvel,
