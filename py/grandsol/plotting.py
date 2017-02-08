@@ -342,8 +342,6 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
         per = post.params['per1']
         
         phase = grandsol.utils.foldData(vdf['jd'], tc, per, cat=True) - 1
-        vcat = np.append(vdf['mnvel'], vdf['mnvel'])
-        ecat = np.append(vdf['errvel'], vdf['errvel'])
 
         modt = np.linspace(-0.5, 0.5, 10000) * per + tc
         mod = post.likelihood.model(modt)
@@ -351,13 +349,18 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
         omod = np.argsort(modp)
         mod = np.append(mod,mod)[omod]
 
+        vcat = post.likelihood.residuals() + post.likelihood.model(post.likelihood.x)
+        vcat = np.append(vcat, vcat)
+        ecat = np.append(vdf['errvel'], vdf['errvel'])
+
+        
         ebar = pl.errorbar(phase, vcat, yerr=ecat, fmt='s', color=colors[i-1])
         pl.plot(modp[omod], mod, color=ebar[0].get_color(), lw=2, label='_nolegend_')
         pl.xlim(-0.5, 0.5)
         pl.xlabel('Phase')
         pl.ylabel('RV m s$^{-1}$')
 
-        Klist.append(np.exp(post.params['logk1']))
+        Klist.append(post.params['k1'])
         sigmas.append(grandsol.utils.MAD(post.likelihood.residuals()))
         
         os.chdir(workdir)

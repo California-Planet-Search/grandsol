@@ -97,19 +97,19 @@ def orbfit(vdf, tc, per):
     from scipy import optimize
     
     time_base = 2450000
-    params = radvel.RVParameters(1,basis='per tc secosw sesinw logk')
+    params = radvel.RVParameters(1,basis='per tc secosw sesinw k')
     params['per1'] = per
     params['tc1'] = tc
     params['secosw1'] = 0.00 
     params['sesinw1'] = 0.00
-    params['logk1'] = np.log(25.)
+    params['k1'] = 55.0
     params['dvdt'] = 0
     params['curv'] = 0
     mod = radvel.RVModel(params, time_base=time_base)
 
     like = radvel.likelihood.RVLikelihood(mod, vdf['jd'], vdf['mnvel'], vdf['errvel'])
     like.params['gamma'] = 0.0
-    like.params['logjit'] = np.log(1)
+    like.params['jit'] = 1.0
 
     like.vary['dvdt'] = False
     like.vary['curv'] = False
