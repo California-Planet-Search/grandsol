@@ -170,6 +170,18 @@ def run_iterations(opt, ppserver=None):
     else:
         df = grandsol.io.get_observations(opt.star, thin=opt.thin)
         datadir = os.environ['GRAND_DATADIR']
+
+        # Hack to check for low SNR observations in APF
+        # datasets that causes grand to freeze
+        if opt.inst == 'APF':
+            assert 'GRAND_APF_OBSDB' in os.environ.keys(),\
+"When analyzing APF data you must specify GRAND_APF_OBSDB in your environment."
+            obsdb = pd.read_csv(os.environ['GRAND_APF_OBSDB'], parse_dates=['midt'])
+            ocols = df.columns
+            merged = pd.merge(df, obsdb, on='obs', suffixes=['','_obsdb'])
+            merged = merged.query('phocount >= 1e7')
+            df = merged[ocols]
+
     runname = "iGrand_" + opt.star
     rundir = os.getcwd()
     runorders = opt.orders
