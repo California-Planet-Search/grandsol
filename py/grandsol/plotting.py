@@ -161,7 +161,7 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
 
     legendlabels = ["order %d $\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(orders,sigmas)] + ['Mean $\sigma=%.2f$' % grandsol.utils.MAD(vdf['mnvel'])]
     
-    pl.legend(plist, legendlabels, loc='best')
+    pl.legend(plist, legendlabels, loc='best', fontsize=12)
     pl.title(runname + " orders")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
@@ -224,7 +224,7 @@ def truthplot(runname, truthvel, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=N
     else: pl.savefig(outfile)
 
 
-def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
+def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None, binsize=2.0):
     """
 
     Plot the RV time-series for ``iGrand`` iterations.
@@ -237,7 +237,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
         will be displayed in an interactive window.
 
     Returns:
-        None
+        DataFrame: DataFrame with velocities from all orders combined
 
     """
 
@@ -260,6 +260,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
             
         try:
             vdf = grandsol.io.combine_orders(runname, obdf, orders)
+            vdf_nobin = vdf.copy()
             diff = np.sum(((vdf['mnvel'] - prev) / vdf['errvel'])**2)
             prev = vdf['mnvel']
             #print i, diff
@@ -267,6 +268,16 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
             print "WARNING: Could not read velocities for iteration %d" % i
             continue
 
+        if binsize > 0.0:
+            bintimes, binvels, binerr = grandsol.utils.timebin(vdf['jd'].values,
+                                                               vdf['mnvel'].values,
+                                                               vdf['errvel'].values,
+                                                               binsize=binsize)
+            vdf = pd.DataFrame([])
+            vdf['jd'] = bintimes
+            vdf['mnvel'] = binvels
+            vdf['errvel'] = binerr
+            
         velplot_mean(vdf, fmt='s', color=colors[i-1])
         #sigmas.append(np.std(vdf['mnvel']))
         sigmas.append(grandsol.utils.MAD(vdf['mnvel']))
@@ -275,10 +286,12 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None)
 
     legendlabels = ["iteration %d\n$\sigma_m=%.2f$ m s$^{-1}$" % (i, s) for i,s in zip(iters,sigmas)]
     
-    pl.legend(legendlabels, loc='best')
+    pl.legend(legendlabels, loc='best', fontsize=12)
     pl.title(runname + " iterations")
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
+
+    return vdf_nobin
 
 def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None):
     """
@@ -329,8 +342,6 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
         per = post.params['per1']
         
         phase = grandsol.utils.foldData(vdf['jd'], tc, per, cat=True) - 1
-        vcat = np.append(vdf['mnvel'], vdf['mnvel'])
-        ecat = np.append(vdf['errvel'], vdf['errvel'])
 
         modt = np.linspace(-0.5, 0.5, 10000) * per + tc
         mod = post.likelihood.model(modt)
@@ -338,13 +349,18 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
         omod = np.argsort(modp)
         mod = np.append(mod,mod)[omod]
 
+        vcat = post.likelihood.residuals() + post.likelihood.model(post.likelihood.x)
+        vcat = np.append(vcat, vcat)
+        ecat = np.append(vdf['errvel'], vdf['errvel'])
+
+        
         ebar = pl.errorbar(phase, vcat, yerr=ecat, fmt='s', color=colors[i-1])
         pl.plot(modp[omod], mod, color=ebar[0].get_color(), lw=2, label='_nolegend_')
         pl.xlim(-0.5, 0.5)
         pl.xlabel('Phase')
         pl.ylabel('RV m s$^{-1}$')
 
-        Klist.append(np.exp(post.params['logk1']))
+        Klist.append(post.params['k1'])
         sigmas.append(grandsol.utils.MAD(post.likelihood.residuals()))
         
         os.chdir(workdir)
@@ -591,6 +607,7 @@ def plot_lsf_byiter(runname, iobs, order, iters=[1,2,3,4,5,6,7,8,9,10]):
 
         cmd = [grlsf_binary, lsffile, str(iobs), str(order), '0']
 
+        print ' '.join(cmd)
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         lsfdf = grandsol.io.read_grlsf(p.stdout)

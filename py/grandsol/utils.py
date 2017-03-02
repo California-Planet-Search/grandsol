@@ -97,19 +97,19 @@ def orbfit(vdf, tc, per):
     from scipy import optimize
     
     time_base = 2450000
-    params = radvel.RVParameters(1,basis='per tc secosw sesinw logk')
+    params = radvel.RVParameters(1,basis='per tc secosw sesinw k')
     params['per1'] = per
     params['tc1'] = tc
     params['secosw1'] = 0.00 
     params['sesinw1'] = 0.00
-    params['logk1'] = np.log(25.)
+    params['k1'] = 55.0
     params['dvdt'] = 0
     params['curv'] = 0
     mod = radvel.RVModel(params, time_base=time_base)
 
     like = radvel.likelihood.RVLikelihood(mod, vdf['jd'], vdf['mnvel'], vdf['errvel'])
     like.params['gamma'] = 0.0
-    like.params['logjit'] = np.log(1)
+    like.params['jit'] = 1.0
 
     like.vary['dvdt'] = False
     like.vary['curv'] = False
@@ -155,3 +155,31 @@ def foldData(bjd,e,p,cat=False):
         phase = np.concatenate((phase,phase+1))
 
     return phase
+
+def timebin(time, meas, meas_err, binsize):
+#  This routine bins a set of times, measurements, and measurement errors 
+#  into time bins.  All inputs and outputs should be floats or double. 
+#  binsize should have the same units as the time array.
+#  - from Andrew Howard, ported to Python by BJ Fulton
+
+    ind_order = np.argsort(time)
+    time = time[ind_order]
+    meas = meas[ind_order]
+    meas_err = meas_err[ind_order]
+    ct=0
+    while ct < len(time):
+        ind = np.where((time >= time[ct]) & (time < time[ct]+binsize))[0]
+        num = len(ind)
+        wt = (1./meas_err[ind])**2.     #weights based in errors
+        wt = wt/np.sum(wt)              #normalized weights
+        if ct == 0:
+            time_out = [np.sum(wt*time[ind])]
+	    meas_out = [np.sum(wt*meas[ind])]
+	    meas_err_out = [1./np.sqrt(np.sum(1./(meas_err[ind])**2))]
+        else:
+            time_out.append(np.sum(wt*time[ind]))
+	    meas_out.append(np.sum(wt*meas[ind]))
+	    meas_err_out.append(1./np.sqrt(np.sum(1./(meas_err[ind])**2)))
+        ct += num
+
+    return time_out, meas_out, meas_err_out

@@ -79,7 +79,7 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
     good_orders = []
     for o in orders:
         cwd = os.getcwd()
-        cmd = "grand %s %s %d 121111 out=%s.%02d.log vorb+ nitf=10" \
+        cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ nitf=10" \
           % (obslist, runname, o, runname, o)
 
         if fudge: cmd += " fudge+"
@@ -168,8 +168,20 @@ def run_iterations(opt, ppserver=None):
                          names=['ind', 'obs', 'unused', 'bc', 'vorb'])
         df['jd'] = df['ind'] + 15000.
     else:
-        df = grandsol.io.get_observations(opt.star)
+        df = grandsol.io.get_observations(opt.star, thin=opt.thin)
         datadir = os.environ['GRAND_DATADIR']
+
+        # Hack to check for low SNR observations in APF
+        # datasets that causes grand to freeze
+        if opt.inst == 'APF':
+            assert 'GRAND_APF_OBSDB' in os.environ.keys(),\
+"When analyzing APF data you must specify GRAND_APF_OBSDB in your environment."
+            obsdb = pd.read_csv(os.environ['GRAND_APF_OBSDB'], parse_dates=['midt'])
+            ocols = df.columns
+            merged = pd.merge(df, obsdb, on='obs', suffixes=['','_obsdb'])
+            merged = merged.query('phocount >= 1e7')
+            df = merged[ocols]
+
     runname = "iGrand_" + opt.star
     rundir = os.getcwd()
     runorders = opt.orders
@@ -231,10 +243,14 @@ def run_iterations(opt, ppserver=None):
         os.chdir(rundir)
         
         if len(joblist) > 0 or n == opt.niter:
-            grandsol.plotting.velplot_by_iter(runname,
+            vdf = grandsol.plotting.velplot_by_iter(runname,
                                               runorders,
                                               outfile='iGrand_%s_velbyiter.pdf'\
                                                % opt.star, iters=iterdone)
+            grandsol.io.write_velocities(vdf,
+                                         outfile='iGrand_%s_iter%02d_velocities.txt'\
+                                         % (opt.star, n))
+
             if opt.truth:
                 grandsol.plotting.truthplot(runname,
                                             opt.truthvel,
