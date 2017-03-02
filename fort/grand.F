@@ -1672,14 +1672,19 @@ c
                write(6,'(''*****  '')')
                write(6,'(''**********************************'')')
                write(6,'(''                                  '')')
- 
-               call find_fxto(fxto,wav_imn(1,m,n),z0(n),tems)      ! fxto is the super sam x10 resolution
-               call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsfjim(1,1,m))    ! make a fine-scale LSF
-               call find_modi(mod_imn(1,m,n),fxto,lsfjim(1,1,m))   ! find the rough model of the obsns
+
+               !write(6,'(''super-sampling the spectrum'')')
+               call find_fxto(fxto,wav_imn(1,m,n),z0(n),tems) ! fxto is the super sam x10 resolution
+               !write(6,'(''getting LSF'')')
+               call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsfjim(1,1,m)) ! make a fine-scale LSF
+               !write(6,'(''finding rough model'')')
+               call find_modi(mod_imn(1,m,n),fxto,lsfjim(1,1,m)) ! find the rough model of the obsns
+               !write(6,'(''finding pixel scale'')')
                call find_rati_bar(pix_imn(1,m,n),mod_imn(1,m,n),   ! find the scale that takes
      .                            bar_imn(1,m,n),rat_imn(1,m,n),   !    model*rat ---> pix
      .                            rej_imn(1,m,n),met_imn(1,m,n),NIT)                  
-               if (FIND_LSF) 
+               !write(6,'(''finding best LSF'')')
+               if (FIND_LSF)
      .         call find_lsfq_sp(pix_imn(1,m,n),                   ! using the WLS and normalization,
      .                           rej_imn(1,m,n),                   !    find the spatially var LSF
      .                           rat_imn(1,m,n),fxto,              !    that best fits the fxto model
@@ -2542,7 +2547,6 @@ c
       integer nrej, irej
 
       irej = 1
-
       do i = 0001, 4021
          reji(i) = 0
          if (meti(i).ge.2) reji(i) = 1
@@ -2564,7 +2568,8 @@ c
                ptot = ptot + pixi(i)
                mtot = mtot + modi(i)
                endif 
-            enddo   
+            enddo
+
          rat = ptot/mtot
          ntot = 0
          rtot = 0.
@@ -2585,6 +2590,8 @@ c
          if ((NIT.le.1.and.rmax.gt.6.0*sig).or.
      .       (NIT.eq.2.and.rmax.gt.5.0*sig).or.
      .       (NIT.ge.3.and.rmax.gt.4.0*sig)) then
+!            write(6,'(''find_rati_bar: '', f8.4,2x,f8.4)')
+!     .           rmax,sig
             reji(imax) = 1
             goto 1
             endif
