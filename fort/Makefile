@@ -1,4 +1,4 @@
-BINDIR = ../bin
+BINDIR = $(GRAND_BINDIR)
 
 all:	$(BINDIR)/grand $(BINDIR)/grlsf
 

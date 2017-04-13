@@ -27,8 +27,7 @@ def execute(cmd, cwd, plotres):
     lock = subprocess.Popen(["echo 'Start Time: '`date` > order_%02d.run" % o],
                              shell=True)
 
-    p = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
+    p = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     errcode = p.returncode
 
@@ -79,8 +78,8 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
     good_orders = []
     for o in orders:
         cwd = os.getcwd()
-        cmd = "grand %s %s %d 111111 out=%s.%02d.log vorb+ nitf=10" \
-          % (obslist, runname, o, runname, o)
+        cmd = "%s/grand %s %s %d 111111 out=%s.%02d.log vorb+ nitf=10" \
+          % (os.environ['GRAND_BINDIR'], obslist, runname, o, runname, o)
 
         if fudge: cmd += " fudge+"
         else: cmd += " fudge-"
@@ -110,11 +109,11 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
             cmd += " FIND_TEM+"
 
              
-        if overwrite or not os.path.isfile('order_%02d.done' % o): 
+        if overwrite or not os.path.isfile('order_%02d.done' % o):
+            print "Running command: '%s'" % cmd
             if ppserver == None:
-                execute(cmd, cwd)
+                execute(cmd, cwd, plotres)
             else:
-                print "Running command: '%s'" % cmd
                 jobs.append(ppserver.submit(execute, (cmd,cwd,plotres),
                                             modules=('subprocess','os', 'time', 'grandsol')))
         else:

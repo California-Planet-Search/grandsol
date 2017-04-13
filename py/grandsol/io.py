@@ -137,7 +137,7 @@ def read_vel(infile):
     
     return zdf
 
-def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=False, get_weights=False):
+def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=True, get_weights=False):
     """
     Combine velocities from multiple orders by mean and merge with observation information.
 
