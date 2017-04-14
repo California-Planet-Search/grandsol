@@ -17,26 +17,31 @@ def load_bc(bcfile):
         DataFrame
     """
     
-    kbc = pd.read_csv(bcfile, sep=' ', skiprows=1, skip_blank_lines=True, skipinitialspace=True, names=['obs', 'name', 'bc', 'jd', 'ha', 'type'])
+    kbc = pd.read_csv(bcfile, sep=' ', skiprows=1, skip_blank_lines=True,
+                          skipinitialspace=True,
+                          names=['obs', 'name', 'bc', 'jd', 'ha', 'type'])
 
     return kbc
 
 def get_observations(star, thin=999):
     """
-    Find observations of a given star from $GRAND_KBCVEL and convert into a Pandas DataFrame.
+    Find observations of a given star from $GRAND_KBCVEL and 
+    convert into a Pandas DataFrame.
 
     Args:
         star (str): star name (case insensitive)
         thin (int): limit maximum number of observations
 
     Returns:
-       DataFrame containing the rows in $GRAND_KBCVEL corresponding to the requested star
+       DataFrame containing the rows in $GRAND_KBCVEL corresponding 
+           to the requested star
         
     """
     bcfile = os.environ['GRAND_KBCVEL']
     kbc = load_bc(bcfile)
     
-    star = kbc[(kbc['name'].str.upper() == star.upper()) & (kbc['type'] == 'o') & ~kbc.obs.str.startswith('rk')]
+    star = kbc[(kbc['name'].str.upper() == star.upper()) &
+                   (kbc['type'] == 'o') & ~kbc.obs.str.startswith('rk')]
 
     if len(star.obs.values) > thin:
         np.random.seed(0)
@@ -71,7 +76,8 @@ def read_obslist(infile):
         
     return odf
 
-def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=False, inst="HIRES", overwrite=False):
+def write_obslist(df, sysvel, datadir, outfile='obslist',
+                      vorb=None, meteor=False, inst="HIRES", overwrite=False):
     """
     Write list of observations in the format that ``grand`` likes.
 
@@ -79,7 +85,8 @@ def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=Fals
         df (DataFrame): Pandas DataFrame with observation rows to be analyzed
         sysvel (float): Systemic radial velocity of the system in m/s
         outfile (string): (optional) name of output observation list
-        vorb (float scalar or array): (optional) initial velocity guess for each observation
+        vorb (float scalar or array): (optional) initial velocity 
+            guess for each observation
         meteor (bool): Add meteor line to obslist?
         instrument (string): instrument string in obslist
         overwrite (bool): (optional) overwrite if outfile already exists?
@@ -98,12 +105,15 @@ def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=Fals
     odf = df.sort_values('jd').reset_index(drop=True)
     odf['ind'] = odf.index.values + 1
     
-    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\nINSTRUMENT = "%s"\n' % (sysvel, datadir, inst)
+    header = 'VSYST = %.0f m/s\nRJDIR = "%s/"\nINSTRUMENT = "%s"\n' \
+               % (sysvel, datadir, inst)
     if meteor:
         header += "METEOR meteor\n" 
     body = odf.to_string(index=False, header=False,
                          columns=['ind', 'obs','fill', 'bc', 'vorb'],
-                         formatters=['{:03d}'.format, '{:s}'.format, '{:d}'.format, '{:.5f}'.format, '{:.5f}'.format])
+                         formatters=['{:03d}'.format, '{:s}'.format,
+                                    '{:d}'.format, '{:.5f}'.format,
+                                    '{:.5f}'.format])
     if overwrite or not os.path.isfile(outfile):
         f = open(outfile, 'w')
         print >>f, header+body
@@ -113,22 +123,26 @@ def write_obslist(df, sysvel, datadir, outfile='obslist', vorb=None, meteor=Fals
 
 def read_vel(infile):
     """
-    Read velocity file (.vel) from grand output. Z is converted to velocity and appended as new columns where appropriate.
+    Read velocity file (.vel) from grand output. Z is converted 
+    to velocity and appended as new columns where appropriate.
 
     Args:
         infile (string): input file name
 
     Returns:
-        DataFrame: Pandas DataFrame with the data contained in the specified velocity file.
+        DataFrame: Pandas DataFrame with the data contained in 
+            the specified velocity file.
     
     """
     
-    zdf = pd.read_csv(infile, sep=' ', names=['ind', 'zn', 'z0', 'zbarn', 'zsign']).set_index('ind')
+    zdf = pd.read_csv(infile, sep=' ',
+                names=['ind', 'zn', 'z0', 'zbarn', 'zsign']).set_index('ind')
 
     lines_find = np.loadtxt(infile.replace('.99.vel','.lines_find'))
     nlines = lines_find.shape[0]
     
-    zdf['vbarn'],zdf['uvbarn'] = relativity.redshift_to_vel(zdf['zbarn'], zdf['zsign'])
+    zdf['vbarn'],zdf['uvbarn'] = relativity.redshift_to_vel(zdf['zbarn'],
+                                                            zdf['zsign'])
 
     zdf['uvbarn'] *= c / np.sqrt(nlines)
     
@@ -137,23 +151,31 @@ def read_vel(infile):
     
     return zdf
 
-def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=True, get_weights=False):
+def combine_orders(runname, obdf, orders, varr_byorder=False,
+                       usevln=True, get_weights=False):
     """
-    Combine velocities from multiple orders by mean and merge with observation information.
+    Combine velocities from multiple orders by mean and merge 
+    with observation information.
 
     Args:
         runname (str): name of current grand run
-        obdf (DataFrame): observation data frame from grandsol.io.write_obslist
+        obdf (DataFrame): observation data frame from 
+            grandsol.io.write_obslist
         orders (list): list of orders to combine
-        varr_byorder (bool): (optional) return full velocity-by-order array in addition to the normal output
-        usevln (bool): (optional) use zln instead of zbarn to calculate velocities
-        get_weights (bool): (optional) return the weight matrix instead of the velocities
+        varr_byorder (bool): (optional) return full velocity-by-order
+            array in addition to the normal output
+        usevln (bool): (optional) use zln instead of zbarn to 
+            calculate velocities
+        get_weights (bool): (optional) return the weight matrix 
+            instead of the velocities
 
     Returns:
-        DataFrame: Same as obdf with mean velocity (mnvel) and velocity uncertainty (errvel) columns added
+        DataFrame: Same as obdf with mean velocity (mnvel) and 
+            velocity uncertainty (errvel) columns added
         or
-        tuple: (vdf, mnvel) mnvel is a len(orders)xlen(observations) array that contains the velocities
-                      for each other before taking the mean
+        tuple: (vdf, mnvel) mnvel is a len(orders)xlen(observations) 
+            array that contains the velocities
+            for each other before taking the mean
         or
         array: weight matrix if get_weights==True)
     """
@@ -165,7 +187,8 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=True, get_w
         vdf = grandsol.io.read_vel('%s.%02d.99.vel' % (runname,o))
 
         if (vdf['zn'] == vdf['z0']).all():
-            print "io.combine_orders: WARNING: order %d velocities are all 0.0" % o
+            print "io.combine_orders: WARNING: order %d velocities are all 0.0"\
+                     % o
             continue
 
         if usevln:
@@ -196,7 +219,8 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=True, get_w
     #vdf['mnvel'] = np.average(relvel.values(), weights=w, axis=0)
     #weight_matrix = np.ones_like(relvel)
     #vdf['mnvel'] = np.median(relvel.values(), axis=0)
-    vdf['mnvel'], weight_matrix = grandsol.utils.clipped_mean(relvel.values(), inweights=w, sigma=4)
+    vdf['mnvel'], weight_matrix = grandsol.utils.clipped_mean(relvel.values(),
+                                                        inweights=w, sigma=4)
     
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])
@@ -223,8 +247,10 @@ def read_modfile(modfile):
     """
 
     model = pd.read_csv(modfile, sep=' ', skipinitialspace=True,
-                        names=['ind', 'order', 'pixel', 'spec', 'model', 'wav_obs', 'wav_star', 'cont',
-                                'smooth_cont', 'badflag', 'tellflag', 'metflag'])
+                        names=['ind', 'order', 'pixel', 'spec',
+                                'model', 'wav_obs', 'wav_star', 'cont',
+                                'smooth_cont', 'badflag', 'tellflag',
+                                'metflag'])
 
     return model
 
@@ -239,9 +265,11 @@ def read_temfile(temfile):
         Pandas DataFrame view of the .tem file
     """
 
-    temp = pd.read_csv(temfile, sep=' ', skipinitialspace=True, names=['inode', 'wav', 'temp', 'temp_prev', 'solar'])
+    temp = pd.read_csv(temfile, sep=' ', skipinitialspace=True,
+                           names=['inode', 'wav', 'temp', 'temp_prev', 'solar'])
     
-    temp.drop_duplicates(subset=['temp', 'temp_prev'], inplace=True, keep=False)
+    temp.drop_duplicates(subset=['temp', 'temp_prev'],
+                             inplace=True, keep=False)
     
     temp.temp *= temp.solar.mean()
     temp.temp_prev *= temp.solar.mean()
@@ -250,19 +278,24 @@ def read_temfile(temfile):
 
 def read_grlsf(lsffile):
     """
-    Convert ``grlsf`` output containing PSFs for all nodes accross a single order into a Pandas DataFrame.
+    Convert ``grlsf`` output containing PSFs for all nodes 
+    accross a single order into a Pandas DataFrame.
 
     Args:
-        lsffile (string, file buffer, or any object with a read() method): Name of the lsffile,
-                                  or any file buffer like object with a read() method (e.g. stdout from a subprocess.Popen call).
-                                  This must be from a multi-node ``grlsf`` call (final argument = 0)
+        lsffile (any object with a read method): Name 
+            of the lsffile,
+            or any file buffer like object with a read() method 
+            (e.g. stdout from a subprocess.Popen call).
+            This must be from a multi-node ``grlsf`` call (final argument = 0)
 
     Returns:
         DataFrame corresponding to ``grlsf`` output with columns labeled.
 
     """
 
-    df = pd.read_csv(lsffile, sep=' ', skipinitialspace=True, comment="#", names=['obs', 'order', 'node', 'j', 'dj', 'lsf'])
+    df = pd.read_csv(lsffile, sep=' ', skipinitialspace=True,
+                         comment="#",
+                         names=['obs', 'order', 'node', 'j', 'dj', 'lsf'])
 
     return df
 
@@ -274,11 +307,15 @@ def read_truth(tfile):
         wlsfile (string): input file name, (e.g. sun.034.02)
 
     Returns:
-        DataFrame: input data contained within `wlsfile` represented as a Pandas DataFrame
+        DataFrame: input data contained within `wlsfile` 
+            represented as a Pandas DataFrame
 
     """
 
-    df = pd.read_csv(tfile, sep=' ', skipinitialspace=True, comment='#', names=['waveleng', 'temp*iod', 'noise', 'norm_vec', 'obs_spec'])
+    df = pd.read_csv(tfile, sep=' ', skipinitialspace=True,
+                         comment='#',
+                         names=['waveleng', 'temp*iod',
+                                'noise', 'norm_vec', 'obs_spec'])
 
     return df
 
@@ -296,5 +333,7 @@ def write_velocities(df, outfile):
     for old,new in colmap.items():
         df[new] = df[old]
         
-    df.to_csv(outfile, sep=' ', columns=['obs', 'jd', 'mnvel', 'errvel', 'bc'], index=False)
+    df.to_csv(outfile, sep=' ',
+              columns=['obs', 'jd', 'mnvel', 'errvel', 'bc'],
+              index=False)
 
