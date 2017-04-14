@@ -190,6 +190,7 @@ def run_iterations(opt, ppserver=None):
 
         n = i+1
         idir = "iter%02d" % n
+            
         if not os.path.exists(idir):
             os.makedirs(idir)
 
@@ -201,6 +202,8 @@ def run_iterations(opt, ppserver=None):
 
         os.chdir(idir)
         obfile = 'obslist_%02d' % n
+
+        
         if i == 0:
             vorb = pd.Series(np.zeros_like(df['jd']))
             obdf = grandsol.io.write_obslist(df, opt.sysvel,
@@ -213,7 +216,7 @@ def run_iterations(opt, ppserver=None):
                                              datadir, outfile=obfile,
                                              vorb=vorb, meteor=include_meteor,
                                              inst=opt.inst)
-
+            
         runorders, joblist = run_orders(runname, obfile, ppserver,
                                         orders=runorders,
                                         overwrite=opt.overwrite,
@@ -221,8 +224,6 @@ def run_iterations(opt, ppserver=None):
                                         waveguess=opt.wave, fixwave=opt.fixwave,
                                         lsfguess=opt.lsf, fixlsf=opt.fixlsf,
                                         temguess=opt.tem, fixtem=opt.fixtem)
-        vdf, mnvel = grandsol.io.combine_orders(runname, obdf,
-                                                runorders, varr_byorder=True)
 
         grandsol.plotting.velplot_by_order(runname, obdf,
                                            runorders,
@@ -238,6 +239,10 @@ def run_iterations(opt, ppserver=None):
                                                   obdf, datadir,
                                                   runorders)
 
+        vdf, mnvel = grandsol.io.combine_orders(runname, obdf,
+                                        runorders, varr_byorder=True)
+
+            
         iterdone.append(n)
         os.chdir(rundir)
         
@@ -246,6 +251,11 @@ def run_iterations(opt, ppserver=None):
                                               runorders,
                                               outfile='iGrand_%s_velbyiter.pdf'\
                                                % opt.star, iters=iterdone)
+            vdf = grandsol.plotting.velplot_by_iter(runname,
+                                              runorders,
+                                              outfile='iGrand_%s_bcbyiter.pdf'\
+                                               % opt.star, iters=iterdone, vsbc=True)
+
             grandsol.io.write_velocities(vdf,
                                          outfile='iGrand_%s_iter%02d_velocities.txt'\
                                          % (opt.star, n))
@@ -262,6 +272,7 @@ def run_iterations(opt, ppserver=None):
                                                     opt.phase[1], opt.phase[0],
                                                     outfile='%s_phase.pdf'\
                                                      % runname, iters=iterdone)
+
                 
         if opt.plottemp:
             grandsol.plotting.plot_template_byiter(runname,

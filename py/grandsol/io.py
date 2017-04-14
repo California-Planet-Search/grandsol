@@ -187,13 +187,16 @@ def combine_orders(runname, obdf, orders, varr_byorder=False, usevln=True, get_w
 
     relvel = (rv - bc) + prev
 
-    w = 1/warr.mean(axis=1)
+    #w = 1/warr.mean(axis=1)
+    w = 1/np.std(relvel.vel, axis=1)
     w /= w.max()
+    #w = w*0 + 1.0
     
     #vdf['mnvel'] = relvel.mean().values()
     #vdf['mnvel'] = np.average(relvel.values(), weights=w, axis=0)
+    #weight_matrix = np.ones_like(relvel)
     #vdf['mnvel'] = np.median(relvel.values(), axis=0)
-    vdf['mnvel'], weight_matrix = grandsol.utils.clipped_mean(relvel.values(), inweights=w, sigma=5)
+    vdf['mnvel'], weight_matrix = grandsol.utils.clipped_mean(relvel.values(), inweights=w, sigma=4)
     
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])

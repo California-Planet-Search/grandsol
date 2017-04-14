@@ -95,7 +95,7 @@ def add_scalebar(ax, matchx=True, matchy=True, hidex=True, hidey=True, **kwargs)
 
 
 
-def velplot_mean(vdf, fmt='s', color='k'):
+def velplot_mean(vdf, fmt='s', color='k', vsbc=False):
     """
     The standard RV time series plot for `iGrand`
 
@@ -103,14 +103,19 @@ def velplot_mean(vdf, fmt='s', color='k'):
         vdf (DataFrame): containing 'jd', 'mnvel', and 'errvel' columns at a minumum
         fmt (string): (optional) matplotlib.plot format code to determine marker shape
         color (string): (optional) marker color
+        vsbc (bool): (optional) BC on x-axis instead of JD
 
     Returns:
         None
     """
-    
-    pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, color=color, markersize=10, markeredgewidth=1)
-    pl.ylabel('RV [m$^{-1}$]')
-    pl.xlabel('HJD$_{\\rm UTC}$ - 2440000')
+    if vsbc:
+        pl.errorbar(vdf['bc_y'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, color=color, markersize=10, markeredgewidth=1)
+        pl.xlabel('BC [m s$^{-1}$]')
+    else:
+        pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, color=color, markersize=10, markeredgewidth=1)
+        pl.xlabel('HJD$_{\\rm UTC}$ - 2440000')
+
+    pl.ylabel('RV [m s$^{-1}$]')
 
 def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
     """
@@ -137,7 +142,7 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
     vdf, relvel = grandsol.io.combine_orders(runname, obdf, orders, varr_byorder=True)
     weights = grandsol.io.combine_orders(runname, obdf, orders, get_weights=True)
     allbad = weights == 0
-    
+        
     sigmas = []
     plist = []
     for i,o in enumerate(orders):
@@ -153,9 +158,9 @@ def velplot_by_order(runname, obdf, orders, outfile=None, vsbc=False):
         plist.append(p)
 
     if vsbc:
-        pl.errorbar(obdf['bc'], vdf['mnvel'], yerr=vdf['errvel'], fmt='s', color=colors[i], markersize=10, markeredgewidth=1)
-        pl.ylabel('RV [m$^{-1}$]')
-        pl.xlabel('BC [m$^{-1}$]')
+        #pl.errorbar(obdf['bc'], vdf['mnvel'], yerr=vdf['errvel'], fmt='s', color=colors[i], markersize=10, markeredgewidth=1)
+        pl.ylabel('RV [m s$^{-1}$]')
+        pl.xlabel('BC [m s$^{-1}$]')
     else:
         velplot_mean(vdf, color=colors[i])
 
@@ -224,7 +229,7 @@ def truthplot(runname, truthvel, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=N
     else: pl.savefig(outfile)
 
 
-def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None, binsize=2.0):
+def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None, binsize=2.0, vsbc=False):
     """
 
     Plot the RV time-series for ``iGrand`` iterations.
@@ -234,7 +239,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None,
         orders (list): list of orders to combine to derive the RVs for each iteration
         iters (list): (optional) list of iteration numbers (starting with 1, not 0)
         outfile (string): (optional) name of the output file. If not given the plot
-        will be displayed in an interactive window.
+            will be displayed in an interactive window.
 
     Returns:
         DataFrame: DataFrame with velocities from all orders combined
@@ -273,12 +278,18 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None,
                                                                vdf['mnvel'].values,
                                                                vdf['errvel'].values,
                                                                binsize=binsize)
+            _, binbc, _ = grandsol.utils.timebin(vdf['jd'].values,
+                                                   vdf['bc_y'].values,
+                                                   vdf['errvel'].values,
+                                                   binsize=binsize)
+
             vdf = pd.DataFrame([])
             vdf['jd'] = bintimes
             vdf['mnvel'] = binvels
             vdf['errvel'] = binerr
+            vdf['bc_y'] = binbc
             
-        velplot_mean(vdf, fmt='s', color=colors[i-1])
+        velplot_mean(vdf, fmt='s', color=colors[i-1], vsbc=vsbc)
         #sigmas.append(np.std(vdf['mnvel']))
         sigmas.append(grandsol.utils.MAD(vdf['mnvel']))
         
@@ -372,7 +383,7 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
 
-def plot_residuals_byobs(modfile, outfile=None):
+def plot_residuals_byobs(modfile, outfile=None, tellurics=False, iodine=False):
     """
 
     Plot spectral flux residuals for all observations on a single plot for each order.
@@ -394,8 +405,8 @@ def plot_residuals_byobs(modfile, outfile=None):
     order = int(modfile.split('.')[1])
     
     model['residuals'] = (model['spec'] - (model['model']*model['cont'])) / model['smooth_cont']
-    model['residuals_percent'] = model['residuals'] * 100
-
+    model['residuals_percent'] = model['residuals'].values * 100
+    
     byobs = model.groupby('ind', as_index=False)
 
     fig = pl.figure(figsize=(16,12))
@@ -406,17 +417,29 @@ def plot_residuals_byobs(modfile, outfile=None):
         singleobs = pd.DataFrame(byobs.get_group(group))
 
         pl.subplot(211)
-        pl.plot(singleobs['wav_obs'],singleobs['residuals_percent'], 'k.', markersize=0.4, rasterized=True)
+        pl.plot(singleobs['wav_obs'],singleobs['residuals_percent'], 'k.', markersize=0.6, rasterized=True)
         pl.title('order %d' % order)
         ax_obs = pl.gca()
     
         pl.subplot(212)
-        pl.plot(singleobs['wav_star'],singleobs['residuals_percent'], 'k.', markersize=0.4, rasterized=True)
+        pl.plot(singleobs['wav_star'],singleobs['residuals_percent'], 'k.', markersize=0.6, rasterized=True)
         ax_star = pl.gca()
 
-    
+
     rms = model.residuals_percent.std()
     mad = grandsol.utils.MAD(model.residuals_percent.values)
+
+    if tellurics:
+        tel = pd.read_csv(os.path.join(os.environ['GRAND_IREFDIR'], 'telluric_4490_9000.csv'))
+        pl.subplot(211)
+        pl.plot(tel['wavl'], tel['spec']*100 - 100, 'g-', lw=2, alpha=0.5)
+
+    if iodine:
+        iod = pd.read_csv(os.path.join(os.environ['GRAND_REFDIR'], 'apfiodine.sam'), sep=' ', skipinitialspace=True, names=['index', 'spec', 'wavl'])
+        iod['spec'] = (iod['spec'] / iod['spec'].mean()) - 1
+        print iod['spec']
+        pl.subplot(211)
+        pl.plot(iod['wavl'], iod['spec'], 'b-', lw=2, alpha=0.5)
     
     waverange = model['wav_obs'].max() - model['wav_obs'].min()
     crop_low = model['wav_obs'].min() + 0.05*waverange
