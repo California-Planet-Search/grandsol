@@ -1,11 +1,52 @@
 
+
+c-----------------------------------------------------------------------
+c
+c 2017.04.19
+c * implemented a MASK option
+c
+c   new command-line option:
+c
+c       MASK=file.msk
+c
+c   this file has one line for each mask; for now,
+c   the mask file will be pixel based, but it could
+c   easily be made to be wavelength based.
+c
+c   Each line has three numbers:  m i1 i2
+c   m  = the order number
+c   i1 = the first pixel number to mask
+c   i2 = the last pixel number to mask
+c
+c   example file:
+c   cat MASK.mii <cr>
+c
+c   8 2159 2161
+c
+c   this will block out pixels 2159 through 2161 in order #8
+c
+c   I haven't checked to see exacly how many pixels can
+c   be masked out this way... there is some limit, since
+c   we need some minimum number of pixels in each region
+c   where I solve for a various nodes.
+c
+c   NOTE: The rejection flag is now kinda awkward... I use
+c         0 for things that are good; 
+c         1 for things found to be bad
+c         2 or 3 for things close to the edge that I want use sometimes
+c         4 for things found to be intrinsically bad
+c         8 for things along the meteor
+c         9 for things masked
+c         ---> since 2 and 3 are used sometimes, I should order
+c              these better 
+c
+c-----------------------------------------------------------------------
 c
 c 2017.01.17 
 c * change the domain over which the WLS nodes are solved for
 c   so that perhaps the WLS will be able to better accomodate
 c   the variation of the LSF
 c
-
 c-----------------------------------------------------------------------
 c
 c compile with gfortran:
@@ -172,6 +213,7 @@ c                                  (_RATA_<= i <=_RATB_)
 c        uuu_imn(i,m,n) = 3  <---- within the outer 20 good pixels 
 c                                  (_RATY_<= i <=_RATZ_)
 c        uuu_imn(i,m,n) = 4  <---- bad value entirely
+c        uuu_imn(i,m,n) = 8  <---- rejected by mask
 c        uuu_imn(i,m,n) = 9  <---- rejected by meteor (not really anymore)
 c        ---> still need to differentiate uuu/rat/met
 c
@@ -592,6 +634,8 @@ c
       character*255 REFDIR
       common /REFDIR_/REFDIR
 
+      character*80 FILE_MASK
+      data FILE_MASK/'NONE'/
 
       character*80 FILE_LSF
       data FILE_LSF/'NONE'/
@@ -688,15 +732,24 @@ c
       real lsf_qS(13)
       real dx, dx_k(09)
 
+      integer NMASKs
+      integer MASKM_n(999)
+      integer MASKI1_n(999)
+      integer MASKI2_n(999)
+      logical XMASK
+
 c------------------------------------------------------------------------------
 c
       call getenv("GRAND_REFDIR", REFDIR)
 
+      XMASK    = .false.
       RJSOURCE = 'NULL'
       LOGFILE  = '<STDOUT>'
       LABEL59  = '<NOLABEL>'
 
       NARGs = iargc()
+
+      NMASKs = 0
 
       NIT = 0
  
@@ -776,6 +829,9 @@ c
          write(6,6004) 'lin{0,1,2}',
      .     'output flag for line regions         (default: ',
      .     _OUTPUT_LIN_, ')'
+         write(6,6004) 'mask=FILE.MII'
+         write(6,6004) 'xmask+       ',
+     .     'set to zero pixels that are masked'
          write(6,6001) ''
          write(6,6001) 'notes:'
          write(6,6001) '  Output flags values:'
@@ -846,6 +902,9 @@ c
 
       write(FILENAME,'(2a,i2.2,a)') trim(LABEL59),'.',mmin,'.wls_lsf'
       open(78,file=FILENAME,status='unknown')
+
+      write(FILENAME,'(2a,i2.2,a)') trim(LABEL59),'.',mmin,'.wls'
+      open(79,file=FILENAME,status='unknown')
 
       write(FILENAME,'(2a,i2.2,a)') trim(LABEL59),'.',mmin,'.par'
       open(60,file=FILENAME,status='unknown')
@@ -1076,6 +1135,40 @@ c
              goto 77
              endif
 
+         if (STRING(1:6).eq.'XMASK+'.or.
+     .       STRING(1:6).eq.'xmask+') then
+             XMASK = .true.
+             goto 77
+             endif
+
+         if (STRING(1:6).eq.'XMASK-'.or.
+     .       STRING(1:6).eq.'xmask-') then
+             XMASK = .false.
+             goto 77
+             endif
+ 
+         if (STRING(1:5).eq.'MASK='.or.
+     .       STRING(1:5).eq.'mask=') then
+             FILE_MASK = STRING(6:80)
+             NMASKs = 0
+             open(76,file=FILE_MASK,status='old')
+   19        continue
+             read(76,*,end=20) MASKM_n(NMASKs+1),
+     .                         MASKI1_n(NMASKs+1),
+     .                         MASKI2_n(NMASKs+1)
+             NMASKs = NMASKs+1
+             if (NMASKs.gt.998) stop 'NMASKs.gt.998' 
+             goto 19
+   20        close(76)
+             print*,'          '
+             print*,'READ IN...'
+             print*,'   NMASKs: ',NMASKs
+             print*,'          '
+             goto 77
+             endif
+
+         write(*,*)
+
          write(*,*)
          write(*,'(''   COMMAND-LINE ARGUMENT UNPARSABLE: '',80a)') 
      .                  STRING
@@ -1231,7 +1324,7 @@ c
  
       write(6,*) ' '
       write(6,*) 'call read_raw...'
-
+      
  
       call read_raw(RJSOURCE,
      .              pix_imn,rat_imn,tem_imn,
@@ -1244,6 +1337,19 @@ c
          wav_imn0(i,m,n) = wav_imn(i,m,n)
          enddo
          enddo
+         enddo
+
+      do N = 1, Ns
+         call mask_meteor(met_imn(1,1,n),NMASKs,MASKM_n,MASKI1_n,
+     .                                                  MASKI2_n)
+         do i = 0001, _IDIM_
+         do m = 0001, _MDIM_
+            if (met_imn(i,m,n).eq.8) then
+                rej_imn(i,m,n) = 8
+                if (XMASK) pix_imn(i,m,n) = 0
+                endif
+            enddo
+            enddo
          enddo
 
       if (FILE_WLS(1:4).ne.'NONE') then
@@ -1294,7 +1400,7 @@ c
              enddo!k
           write(*,'(i3.3,1x,i2.2,2x,9f8.4)') n,m,(dx_k(k),k=1,9)
           print*,' '
-          STOP 'check out file fort.81...'                      
+          stop 'check out file fort.81...'                      
 c
 c
 c-----------------------------------------------------------
@@ -1360,7 +1466,7 @@ c
          do m = MMIN, MMAX
 
             write(6,*) 'call find_initmod...'
-            call find_initmod(pix_imn(1,m,n),
+            call find_initmod(pix_imn(1,m,n),rej_imn(1,m,n),
      .                        wav_imn(1,m,n),gopt,dopt,sopt,m,emin,
      .                        FIND_WLS)
 
@@ -1398,24 +1504,9 @@ c
 
             call find_ftso(ftso,wav_imn(1,m,n))
             call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
-            call find_rat0(pix_imn(1,m,n),
+            call find_rat0(pix_imn(1,m,n),rej_imn(1,m,n),
      .                     mod_imn(1,m,n),
      .                     rat_imn(1,m,n))
-
-c           if (.true.) then
-c               call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
-c    .                                        rej_imn(1,m,n))
-c               do i = 0001, 4021
-c                  write(57,157) i, pix_imn(i,m,n), mod_imn(i,m,n), 
-c    .                              rat_imn(i,m,n), bar_imn(i,m,n),
-c    .                              wav_imn(i,m,n), rej_imn(i,m,n)
-c 157              format(1x,i4.4,1x,f8.1,1x,f8.1,
-c    .                            1x,f8.5,1x,f8.1,
-c    .                            1x,f12.6,1x,i1)
-c                  enddo 
-c               close(57)
-c               print*,'close(57)'
-c               endif
  
 c------------------------------------------------------------
 c
@@ -1437,35 +1528,39 @@ c
             do NNIT = 1, 99
 
                if (FIND_WLS) then
-                  call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                            wav_imn(1,m,n),rat_imn(1,m,n),
-     .                            tem_imn(1,m,n),
-     .                            lsfjim(1,1,m),coeffw)
-c                   call tweak_wls3(pix_imn(1,m,n),rej_imn(1,m,n),
-c     .                             wav_imn(1,m,n),rat_imn(1,m,n),
-c     .                             tem_imn(1,m,n),
-c     .                             lsfjim(1,1,m),coeffw)
+                   call tweak_wls2(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                             wav_imn(1,m,n),rat_imn(1,m,n),
+     .                             tem_imn(1,m,n),
+     .                             lsfjim(1,1,m),coeffw)
                    call wavi2wavk(wav_imn(1,m,n),
      .                            wav_kmn(1,m,n))
+                   do k = 1, 9 
+                      write(*,'(''NNIT='',i2,'' k='',i1,1x,9f15.8)')
+     .                      NNIT,k,wav_kmn(k,m,n)
+                      enddo
                    endif
 
                call find_ftso(ftso,wav_imn(1,m,n))
-  
+      
                if (FILE_LSF(1:4).eq.'NONE') then
                    if (NNIT.le.20) then
                        call tweak_gsn(pix_imn(1,m,n),rej_imn(1,m,n),
      .                                wav_imn(1,m,n),rat_imn(1,m,n),
      .                                gsn_im(1,m),lsfjim(1,1,m))
                        call lsfji2lsfqk(lsfjim(1,1,m),lsfqkmn(1,1,m,n))
+                       do k = 01, 09
+                          write(*,'(''tweak_gsn: '',i1,1x,13f9.5)') 
+     .                             k,(lsfqkmn(q,k,m,n),q=1,13)
+                          enddo
                        endif
                   endif
- 
-               call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
 
+               call find_modi(mod_imn(1,m,n),ftso,lsfjim(1,1,m))   ! find the rough model of the obsns
+      
                call find_tem_snglQ(pix_imn(1,m,n),rej_imn(1,m,n),  ! find a v smooth version of the template 
      .                             mod_imn(1,m,n),rat_imn(1,m,n),  !      from a single observation
      .                             tem_imn(1,m,n))
- 
+
                nrej = find_locrej(pix_imn(1,m,n),mod_imn(1,m,n),
      .                            rej_imn(1,m,n),sigi)
 
@@ -1475,21 +1570,17 @@ c     .                             lsfjim(1,1,m),coeffw)
   444          format('NIT',i2.2,':',i3.3,'.',i2.2,'_',i2.2,1x,i2,1x,
      .                            3x,09(f6.3,1x),
      .                            3x,09(f5.3,1x))
+
                if (.not.FIND_WLS.and.NNIT.ge.05) goto 443
                enddo!NNIT
  443           continue
-    
-            call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
-     .                                 rej_imn(1,m,n))
 
-c           do i = 0001, 4021
-c              write(58,158) i, pix_imn(i,m,n), mod_imn(i,m,n), 
-c    .                          rat_imn(i,m,n), bar_imn(i,m,n),
-c    .                          wav_imn(i,m,n), rej_imn(i,m,n)
-c 158          format(1x,i4.4,1x,f8.1,1x,f8.1,
-c    .                        1x,f8.5,1x,f8.1,
-c    .                        1x,f12.6,1x,i1)
-c              enddo
+            call find_bari(pix_imn(1,m,n),bar_imn(1,m,n),     ! average pixel value, for norm'n
+     .                                    rej_imn(1,m,n))
+            write(79,179) 0,N,M,(wav_kmn(k,m,n),k=1,9)
+
+
+
 
             enddo!m
 
@@ -1518,8 +1609,7 @@ c
      .             FILENAME255 = trim(REFDIR) // 
      .                        '/BSTAR_CORRECTION.2012.10.23'
                if (INSTRUMENT(1:3).eq.'APF')
-     .             FILENAME255 = trim(REFDIR) // 
-     .                        '/FUDGE_APF.2017.03.06.IWFF'
+     .             FILENAME255 = 'FUDGE_APF.2017.03.01.IWFF'
                if (FILENAME255(1:4).eq.'NONE') stop 'BAD FUDGE'
                open(19,file=FILENAME255,status='old')
                write(60,'(2a)'), 'fudge_file: ',trim(FILENAME255)
@@ -1562,6 +1652,9 @@ c
          close(15)
          close(82)
 
+
+
+
          if (BADs.ne.0) then
              write(6,*) ' '
              write(6,*) 'There were serious problems with the following'
@@ -1596,18 +1689,17 @@ c to get our initial estimate of the "average" template.
 c
       if (FIND_TEM) then
          call make_init_tem(tems,tem_imn,wav_imn,z0,Ns,MMIN,MMAX)
-c        call cnorm_tem(tems,tems,NIT,LABEL59)
          call cnorm_tem_bar(tems,tems,NIT,LABEL59,wav_imn(0501,MMIN,1),
      .                                            wav_imn(3501,MMIN,1))
          endif
 
       
       call tell_rej(wav_imn,tel_imn,Ns) ! now that we have a wls, flag telluric lines
+
       call fill_mod_imn(mod_imn,wav_imn,lsfqkmn,tems,z0,unim,
      .                  Ns,MMIN,MMAX)
  
- 
- 
+
  
 c-----------------------------------------------------------
 c
@@ -1672,19 +1764,14 @@ c
                write(6,'(''*****  '')')
                write(6,'(''**********************************'')')
                write(6,'(''                                  '')')
-
-               !write(6,'(''super-sampling the spectrum'')')
-               call find_fxto(fxto,wav_imn(1,m,n),z0(n),tems) ! fxto is the super sam x10 resolution
-               !write(6,'(''getting LSF'')')
-               call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsfjim(1,1,m)) ! make a fine-scale LSF
-               !write(6,'(''finding rough model'')')
-               call find_modi(mod_imn(1,m,n),fxto,lsfjim(1,1,m)) ! find the rough model of the obsns
-               !write(6,'(''finding pixel scale'')')
+ 
+               call find_fxto(fxto,wav_imn(1,m,n),z0(n),tems)      ! fxto is the super sam x10 resolution
+               call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsfjim(1,1,m))    ! make a fine-scale LSF
+               call find_modi(mod_imn(1,m,n),fxto,lsfjim(1,1,m))   ! find the rough model of the obsns
                call find_rati_bar(pix_imn(1,m,n),mod_imn(1,m,n),   ! find the scale that takes
      .                            bar_imn(1,m,n),rat_imn(1,m,n),   !    model*rat ---> pix
      .                            rej_imn(1,m,n),met_imn(1,m,n),NIT)                  
-               !write(6,'(''finding best LSF'')')
-               if (FIND_LSF)
+               if (FIND_LSF) 
      .         call find_lsfq_sp(pix_imn(1,m,n),                   ! using the WLS and normalization,
      .                           rej_imn(1,m,n),                   !    find the spatially var LSF
      .                           rat_imn(1,m,n),fxto,              !    that best fits the fxto model
@@ -1734,11 +1821,9 @@ c     sb = r8s_ww(wav_imn(4020,MMAX,1))
          call smoo_tem(tems,NIT)
          endif 
  
-      if (NIT.le.5.and.FIND_TEM) then
-c        call cnorm_tem(tems,tems,NIT,LABEL59)
-         call cnorm_tem_bar(tems,tems,NIT,LABEL59,wav_imn(0501,MMIN,1),
+      if (NIT.le.5.and.FIND_TEM) 
+     .   call cnorm_tem_bar(tems,tems,NIT,LABEL59,wav_imn(0501,MMIN,1),
      .                                            wav_imn(3501,MMIN,1))
-         endif
 
  
     7 continue
@@ -1749,14 +1834,14 @@ c compute a new version of the current model
 c
       call fill_mod_imn(mod_imn,wav_imn,lsfqkmn,tems,z0,unim,
      .                  Ns,MMIN,MMAX)
+
       call fill_rat_imn(pix_imn,mod_imn,
      .                  bar_imn,rat_imn,
      .                  rej_imn,met_imn,unim,Ns,
      .                  NIT,MMIN,MMAX)
  
- 
- 
- 
+
+
 c-------------------------------------------------------------
 c
 c re-compute the best velocity; this is no longer used in
@@ -1809,6 +1894,9 @@ c save the current model ; eventually, I'll prolly do this at
 c the end of the iteration, but for now, I'd like the chance
 c of saving things mid-step, so I can mebbe start mid-step
 c
+      print*,' '
+      print*,'SAVE_MOD --- '
+      print*,' '
       call save_mod(pix_imn,mod_imn,wav_imn,
      .              rat_imn,bar_imn,
      .              rej_imn,tel_imn,met_imn,
@@ -1820,51 +1908,53 @@ c
      .              rat_imn,bar_imn,rej_imn,
      .              unim,NIT,Ns,LABEL59,MMIN,MMAX)
 
-      if (.true.) then
-          print*,' '
-          do N = 1, Ns
-          do m = MMIN, MMAX
-             call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsf_ji)
-             do k = 1, 9
-                do q = 01, 13
-                   lsf_qk(q,k) = lsfqkmn(q,k,m,n)
-                   enddo
-                call lsfq2lsfj(lsf_qk(1,k),lsf_j0)
-                call lsfj2symm(lsf_j0,lsf_jS,dx)
-                call lsfj2lsfq(lsf_jS,lsf_qk(1,k))
-                dx_k(k) = dx/10.0
-                enddo
-c            write(77,'(i2,1x,i3.3,1x,i2.2,2x,9f8.4)') 
-c    .                  NIT,n,m,(dx_k(k),k=1,9)
-             call lsfqk2lsfji(lsf_qk,lsf_ji)
-             do k = 1, 9
-                coeffw_t(k) = 0.
-                enddo
-             do NNIT = 1, 100
-                call tweak_wls4(pix_imn(1,m,n),rej_imn(1,m,n),
-     .                          wav_imn(1,m,n),rat_imn(1,m,n),
-     .                          tems,lsf_ji,coeffw_k,z0(n),
-     .                          N,NIT,NNIT)
-                call wavi2wavk(wav_imn(1,m,n),wav_kmn(1,m,n))
-                call wavk2wavi(wav_kmn(1,m,n),wav_imn(1,m,n))
-                do k = 1, 9
-                   coeffw_t(k) = coeffw_t(k) + coeffw_k(k)
-                   enddo
-                enddo
-             write( *,113) NIT,N,M,(coeffw_t(k),k=1,9),
-     .                             (dx_k(k),k=1,9)
-             write(78,113) NIT,N,M,(coeffw_t(k),k=1,9),
-     .                             (dx_k(k),k=1,9),
-     .                              wav_kmn(1,m,n)
-  113        format(1x,i2.2,1x,i3.3,1x,i2.2,1x,
-     .                      4x,9(f5.3,1x),
-     .                      4x,9(f5.3,1x),
-     .                      4x,f12.6)
-             enddo
-             enddo
-          print*,' '
-          endif
- 
+      print*,' '
+      print*,'FIND_WLS --- '
+      print*,' '
+      do N = 1, Ns
+      do m = MMIN, MMAX
+         call lsfqk2lsfji(lsfqkmn(1,1,m,n),lsf_ji)
+         do k = 1, 9
+            do q = 01, 13
+               lsf_qk(q,k) = lsfqkmn(q,k,m,n)
+               enddo
+            call lsfq2lsfj(lsf_qk(1,k),lsf_j0)
+            call lsfj2symm(lsf_j0,lsf_jS,dx)
+            call lsfj2lsfq(lsf_jS,lsf_qk(1,k))
+            dx_k(k) = dx/10.0
+            enddo
+c        write(77,'(i2,1x,i3.3,1x,i2.2,2x,9f8.4)') 
+c    .              NIT,n,m,(dx_k(k),k=1,9)
+         call lsfqk2lsfji(lsf_qk,lsf_ji)
+         do k = 1, 9
+            coeffw_t(k) = 0.
+            enddo
+         do NNIT = 1, 100
+            call tweak_wls4(pix_imn(1,m,n),rej_imn(1,m,n),
+     .                      wav_imn(1,m,n),rat_imn(1,m,n),
+     .                      tems,lsf_ji,coeffw_k,z0(n),
+     .                      N,NIT,NNIT)
+            call wavi2wavk(wav_imn(1,m,n),wav_kmn(1,m,n))
+            call wavk2wavi(wav_kmn(1,m,n),wav_imn(1,m,n))
+            do k = 1, 9
+               coeffw_t(k) = coeffw_t(k) + coeffw_k(k)
+               enddo
+            enddo
+         write( *,113) NIT,N,M,(coeffw_t(k),k=1,9),
+     .                         (dx_k(k),k=1,9)
+         write(78,113) NIT,N,M,(coeffw_t(k),k=1,9),
+     .                         (dx_k(k),k=1,9),
+     .                          wav_kmn(1,m,n)
+         write(79,179) NIT,N,M,(wav_kmn(k,m,n),k=1,9)
+  179    format(1x,i2.2,1x,i3.3,1x,i2.2,1x,9(1x,f12.6))
+  113    format(1x,i2.2,1x,i3.3,1x,i2.2,1x,
+     .                  4x,9(f5.3,1x),
+     .                  4x,9(f5.3,1x),
+     .                  4x,f12.6)
+         enddo
+         enddo
+      print*,' '
+
       NIT = NIT + 1
       if (NIT.le.NITf) goto 777
 
@@ -2153,12 +2243,13 @@ c template will then be temi/nrmi
 c
 c-----------------------------------------------
  
-      subroutine find_rat0(pixi,modi,nrmi)
+      subroutine find_rat0(pixi,reji,modi,nrmi)
       implicit none
  
-      real   pixi(_IDIM_)
-      real   modi(_IDIM_)
-      real   nrmi(_IDIM_)
+      real      pixi(_IDIM_)
+      integer*1 reji(_IDIM_)
+      real      modi(_IDIM_)
+      real      nrmi(_IDIM_)
  
       real    temi(_IDIM_)
       real*8  normal(5,5)
@@ -2189,6 +2280,7 @@ c
          rn = 1 + 4.*(i-_RATB_)/(_RATY_-_RATB_)
          call rspline_fp(rn,5,projn_i(1,i),n1,n2)
          use(i) = .true.
+         if (reji(i).ne.0) use(i) = .false.
          enddo
  
 c
@@ -2469,7 +2561,7 @@ c
          psum = 0.
          nsum = 0
          do i = i1, i2
-            if (reji(i).ne.1) then    ! only reject if bad; ok if it's on edge
+            if (reji(i).eq.0.or.reji(i).eq.2.or.reji(i).eq.3) then
                psum = psum + pixi(i)
                nsum = nsum + 1
                endif
@@ -2547,6 +2639,7 @@ c
       integer nrej, irej
 
       irej = 1
+
       do i = 0001, 4021
          reji(i) = 0
          if (meti(i).ge.2) reji(i) = 1
@@ -2568,8 +2661,7 @@ c
                ptot = ptot + pixi(i)
                mtot = mtot + modi(i)
                endif 
-            enddo
-
+            enddo   
          rat = ptot/mtot
          ntot = 0
          rtot = 0.
@@ -2590,8 +2682,6 @@ c
          if ((NIT.le.1.and.rmax.gt.6.0*sig).or.
      .       (NIT.eq.2.and.rmax.gt.5.0*sig).or.
      .       (NIT.ge.3.and.rmax.gt.4.0*sig)) then
-!            write(6,'(''find_rati_bar: '', f8.4,2x,f8.4)')
-!     .           rmax,sig
             reji(imax) = 1
             goto 1
             endif
@@ -2622,7 +2712,7 @@ c
          sig     = sigp(ip) + fp*(sigp(ip+1)-sigp(ip)) 
          rati(i) = bar
          r = (pixi(i)-rati(i)*modi(i))/bari(i)
-         if (reji(i).eq.1) then
+         if (reji(i).eq.1.or.reji(i).ge.4) then
             nrej = nrej + 1
             irej = i
             endif
@@ -4389,11 +4479,13 @@ c
 c------------------------------------------------------
  
  
-      subroutine find_initmod(pixi,wavi,gopt,dopt,sopt,m,emin,FIND_WLS)
+      subroutine find_initmod(pixi,reji,wavi,
+     .                        gopt,dopt,sopt,m,emin,FIND_WLS)
       implicit none
  
-      real   pixi(4021)
-      real*8 wavi(4021)
+      real      pixi(4021)
+      integer*1 reji(4021)
+      real*8    wavi(4021)
       integer gopt
       integer dopt
       integer sopt
@@ -4475,13 +4567,19 @@ c
                psum = 0.
                msum = 0.
                do ii = -3, +3
-                  psum = psum + pixi(i+ii)
-                  msum = msum + modo(o+ii*10)
-                  enddo
-               ratu = psum/msum
-               do ii = -3, 3
-                  e = e + abs(pixi(i+ii)-ratu*modo(o+ii*10))
-                  enddo
+                  if (reji(i+ii).eq.0) then
+                      psum = psum + pixi(i+ii)
+                      msum = msum + modo(o+ii*10)
+                      endif
+                  enddo 
+               if (msum.gt.0) then
+                   ratu = psum/msum
+                   do ii = -3, 3
+                      if (reji(i+ii).eq.0) then
+                          e = e + abs(pixi(i+ii)-ratu*modo(o+ii*10))
+                          endif
+                      enddo
+                   endif
                enddo!i
             if (e.lt.emin) then
                emin = e
@@ -5135,8 +5233,8 @@ c
       integer function find_locrej(pixi,modi,reji,sigi)
       implicit none
  
-      real   pixi(_IDIM_)
-      real   modi(_IDIM_)
+      real      pixi(_IDIM_)
+      real      modi(_IDIM_)
       integer*1 reji(_IDIM_)
       real   sigi(_IDIM_)
  
@@ -5155,31 +5253,36 @@ c to other bad pixels
 c
       find_locrej = 0
       do i = 0001, _IDIM_
-         ic = i
-         if (ic.lt. 0001 +6) ic =  0001  + 5
-         if (ic.gt._IDIM_-6) ic = _IDIM_ - 5
-         psum = 0.
-         ssum = 0.
-         nsum = 0
-         do ii = ic-5, ic+5
-            if (ii.ne.i) then
-               psum = psum + pixi(ii)
-               ssum = ssum + abs(pixi(ii)-modi(ii))
-               nsum = nsum + 1
-               endif
-            enddo
-         pbar = psum/nsum
-         sbar = ssum/nsum
-         sigi(i) = (pixi(i)-modi(i))/sbar
-         if (reji(i).ne.9) reji(i) = 0
-         if (i.lt._IBEG_) reji(i) = 4
-         if (i.gt._IEND_) reji(i) = 4
-         if (i.lt._RATB_) reji(i) = 2
-         if (i.gt._RATY_) reji(i) = 3
-         if (abs(pixi(i)-modi(i)).gt.4.5*sbar) then
-            find_locrej = find_locrej + 1
-            reji(i) = 1
-            endif
+         sigi(i) = 0.
+         if (reji(i).le.1) then
+             ic = i
+             if (ic.lt. 0001 +6) ic =  0001  + 5
+             if (ic.gt._IDIM_-6) ic = _IDIM_ - 5
+             psum = 0.
+             ssum = 0.
+             nsum = 0
+             do ii = ic-5, ic+5
+                if (ii.ne.i.and.reji(ii).eq.0) then
+                   psum = psum + pixi(ii)
+                   ssum = ssum + abs(pixi(ii)-modi(ii))
+                   nsum = nsum + 1
+                   endif
+                enddo
+             if (nsum.ge.5) then
+                 pbar = psum/nsum
+                 sbar = ssum/nsum
+                 sigi(i) = (pixi(i)-modi(i))/sbar
+                 if (reji(i).ne.9) reji(i) = 0
+                 if (i.lt._IBEG_) reji(i) = 4
+                 if (i.gt._IEND_) reji(i) = 4
+                 if (i.lt._RATB_) reji(i) = 2
+                 if (i.gt._RATY_) reji(i) = 3
+                 if (abs(pixi(i)-modi(i)).gt.4.5*sbar) then
+                     find_locrej = find_locrej + 1
+                     reji(i) = 1
+                     endif
+                 endif
+             endif
          enddo
  
       return
@@ -5550,6 +5653,8 @@ c Determine swap from check value (should be 256)
       else if (check .eq. 256) then
         swap = .false.
       else
+        print*,'RDSKFILE = ',RDSKFILE
+        print*,'   check = ',check
         stop 'file is not in dsk format'
       end if
 
@@ -7482,19 +7587,28 @@ c
       real    tq(_IDIM_)
       real    rspline
       real*8  rn
- 
+
+      integer di 
  
       Ns = 0
       do i = 0001 + 2, _IDIM_ -2, 4
+         di = 2
+    3    continue
          psum = 0.
          msum = 0.
-         do ii = -2, 2, 1
+         do ii = -di, di, 1
             ff = 0.250
-            if (ii.eq.-2) ff = 0.125
-            if (ii.eq. 2) ff = 0.125
-            psum = psum + ff*pixi(i+ii)
-            msum = msum + ff*temi(i+ii)*modi(i+ii)*nrmi(i+ii)
+            if (ii.le.-2) ff = 0.125
+            if (ii.ge. 2) ff = 0.125
+            if (reji(i+ii).eq.0) then
+                psum = psum + ff*pixi(i+ii)
+                msum = msum + ff*temi(i+ii)*modi(i+ii)*nrmi(i+ii)
+                endif
             enddo
+         if (msum.le.0) then
+             di = di + 1
+             goto 3
+             endif
          Ns = Ns + 1
          tq(Ns) = psum/msum
          enddo
@@ -7521,13 +7635,13 @@ c-----------------------------------------------
       subroutine tweak_wls2(pixi,reji,wavi,nrmi,temi,lsfji,coeffw)
       implicit none
  
-      real   pixi(_IDIM_)
+      real      pixi(_IDIM_)
       integer*1 reji(_IDIM_)
-      real*8 wavi(_IDIM_)
-      real   nrmi(_IDIM_)
-      real   temi(_IDIM_)
-      real   lsfji(_JDIM_,_IDIM_)
-      real   coeffw(9)
+      real*8    wavi(_IDIM_)
+      real      nrmi(_IDIM_)
+      real      temi(_IDIM_)
+      real      lsfji(_JDIM_,_IDIM_)
+      real      coeffw(9)
  
       real   modo(_ODIM_)
       real   fxto(_ODIM_)
@@ -7625,15 +7739,20 @@ c        di = dspline3(rk,di_k,9)
 
       dsum = 0.
       do i = _RATB_, _RATY_
-         diff_i(i) = pixi(i)-modi(i)
-         dsum = dsum + abs(diff_i(i))
+         if (reji(i).eq.0) then
+             diff_i(i) = pixi(i)-modi(i)
+             dsum = dsum + abs(diff_i(i))
+             endif
          enddo
       dbar = dsum/(_RATY_-_RATB_+1)
 
       do i = 0001, _IDIM_
-         diff_u(i) = diff_i(i)
-         if (diff_u(i).gt. 2.0*dbar) diff_u(i) =  2.0*dbar
-         if (diff_u(i).lt.-2.0*dbar) diff_u(i) = -2.0*dbar
+         diff_u(i) = 0.
+         if (reji(i).eq.0) then
+             diff_u(i) = diff_i(i)
+             if (diff_u(i).gt. 2.0*dbar) diff_u(i) =  2.0*dbar
+             if (diff_u(i).lt.-2.0*dbar) diff_u(i) = -2.0*dbar
+             endif
          enddo
 
       do k = 1, 9
@@ -7653,9 +7772,9 @@ c        di = dspline3(rk,di_k,9)
          coeffw(k) = coeffw(k) + di_k(k)
          enddo
 
-c     write( *,191) (di_k(k),k=1,9)
+      write( *,191) (di_k(k),k=1,9)
 c     write(91,191) (di_k(k),k=1,9)
-  191 format(1x,5x,9f10.5)
+  191 format(1x,5x,9f10.5,5x,'tweak_wls2')
 
       do i = 0001, _IDIM_
          rk = 1 + (_WAVN_-1.0)*
@@ -7690,12 +7809,12 @@ c-----------------------------------------------
       subroutine tweak_gsn(pixi,reji,wavi,nrmi,gsni,lsfji)
       implicit none
  
-      real   pixi(_IDIM_)
+      real      pixi(_IDIM_)
       integer*1 reji(_IDIM_)
-      real*8 wavi(_IDIM_)
-      real   nrmi(_IDIM_)
-      real   gsni(_IDIM_)
-      real   lsfji(_JDIM_,_IDIM_)
+      real*8    wavi(_IDIM_)
+      real      nrmi(_IDIM_)
+      real      gsni(_IDIM_)
+      real      lsfji(_JDIM_,_IDIM_)
  
       real   modo(_ODIM_)
       real   modd(_ODIM_)
@@ -7789,6 +7908,11 @@ c-----------------------------------------------
          enddo
          enddo
  
+      do ni = 1, _WAVN_
+      do nj = 1, _WAVN_
+         write(*,'(i2,1x,i2,1x,f15.8)') ni, nj, normal(ni,nj)
+         enddo
+         enddo
  
       call dinvertNxN(normal,lamron,_WAVN_,_WAVN_)
  
@@ -7807,6 +7931,7 @@ c-----------------------------------------------
          do nj = 1, _WAVN_
             coeffs(n) = coeffs(n) + lamron(n,nj)*vector(nj)
             enddo
+         write(*,'(''QQQ --- '',i4.4,1x,f12.6)') n, coeffs(n)
          enddo
  
  
@@ -9079,7 +9204,7 @@ c
                          nu(Us) = n
                          if (.not.(ru(Us).gt.-9e9)) then
                             Us = Us-1
-                            uuu_imn(i,m,n) = 5
+                            uuu_imn(i,m,n) = 1
                             endif
                          endif
                       endif
@@ -14380,10 +14505,14 @@ c
                do i = max(0001,ic-2), min(4020,ic+2)
                   wwn = wav_imn(i,m,n)/(1+zn(n))
                   if (wwn.ge.wwa.and.wwn.le.wwb) then
-                      Ls = Ls + 1
-                      rl(Ls) = (pix_imn(i,m,n)
+                      if (uuu_imn(i,m,n).eq.0.or.
+     .                    uuu_imn(i,m,n).eq.2.or.
+     .                    uuu_imn(i,m,n).eq.3) then
+                          Ls = Ls + 1
+                          rl(Ls) = (pix_imn(i,m,n)
      .                             -mod_imn(i,m,n)*rat_imn(i,m,n))/
      .                                     bar_imn(i,m,n)
+                          endif
                       endif
                   enddo
                enddo
@@ -15357,21 +15486,23 @@ c
          dsum0 = 0.  ! no shifts
          dsumP = 0.  ! shift +0.1*o
          do i = i1, i2
-            psum  = 0.
-            msum  = 0.
-            do ii = i-5, i+5
-               oo = 101 + (ii-1)*10
-               if (reji(ii).eq.0) then
-                  psum = psum + pixi(ii)
-                  msum = msum + modo(oo)
-                  endif
-               enddo
-            o = 101 + (i-1)*10
-            ratu  = psum/msum
-            dmod  = 0.1*(modo(o+1)-modo(o-1))/2.0
-            dsumM = dsumM + abs(pixi(i)-(modo(o)-dmod)*ratu)
-            dsum0 = dsum0 + abs(pixi(i)-(modo(o)     )*ratu)
-            dsumP = dsumP + abs(pixi(i)-(modo(o)+dmod)*ratu)
+            if (reji(i).eq.0) then
+                psum  = 0.
+                msum  = 0.
+                do ii = i-5, i+5
+                   oo = 101 + (ii-1)*10
+                   if (reji(ii).eq.0) then
+                      psum = psum + pixi(ii)
+                      msum = msum + modo(oo)
+                      endif
+                   enddo
+                o = 101 + (i-1)*10
+                ratu  = psum/msum
+                dmod  = 0.1*(modo(o+1)-modo(o-1))/2.0
+                dsumM = dsumM + abs(pixi(i)-(modo(o)-dmod)*ratu)
+                dsum0 = dsum0 + abs(pixi(i)-(modo(o)     )*ratu)
+                dsumP = dsumP + abs(pixi(i)-(modo(o)+dmod)*ratu)
+                endif
             enddo
          coeffw_k(k) = 0.00
          if (dsumM.lt.dsum0.and.dsumM.lt.dsumP) coeffw_k(k) = -0.005
@@ -15494,3 +15625,33 @@ c
 
       return
       end
+
+
+
+c
+c this subroutine takes a list of pixels to mask and masks them,
+c using the meteor array, setting it to 8
+c
+      subroutine mask_meteor(met_im,NMASKs,MASKM_n,MASKI1_n,MASKI2_n)
+      implicit none
+
+      integer*1 met_im(_IDIM_,_MDIM_)
+      integer   NMASKs
+      integer   MASKM_n(NMASKs)
+      integer   MASKI1_n(NMASKs)
+      integer   MASKI2_n(NMASKs)
+
+      integer NMASK, i, m
+
+      if (NMASKs.eq.0) return
+
+      do NMASK = 1, NMASKs
+         m = MASKM_n(NMASK)
+         do i = MASKI1_n(NMASK), MASKI2_n(NMASK)
+            met_im(i,m) = 8
+            enddo
+         enddo
+
+      return
+      end
+
