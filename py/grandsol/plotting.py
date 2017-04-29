@@ -383,7 +383,7 @@ def phaseplot_by_iter(runname, obdf, orders, tc, per, iters=[1,2,3,4,5,6,7,8,9,1
     if outfile == None: pl.show()
     else: pl.savefig(outfile)
 
-def plot_residuals_byobs(modfile, outfile=None, tellurics=False, iodine=False):
+def plot_residuals_byobs(modfile, outfile=None, tellurics=False, iodine=False, maskfile=None):
     """
 
     Plot spectral flux residuals for all observations on a single plot for each order.
@@ -392,7 +392,7 @@ def plot_residuals_byobs(modfile, outfile=None, tellurics=False, iodine=False):
         modfile (string): name of the .mod file that contains the residuals for all observations and a single order (e.g. iGrand_sun.08.99.mod)
         outfile (string): (optional) name of the output file. If not given the plot
         will be displayed in an interactive window.
-
+        maskfile (string): (optional) path to file containing wavelength mask
     Returns:
         None
 
@@ -440,6 +440,11 @@ def plot_residuals_byobs(modfile, outfile=None, tellurics=False, iodine=False):
         print iod['spec']
         pl.subplot(211)
         pl.plot(iod['wavl'], iod['spec'], 'b-', lw=2, alpha=0.5)
+
+    if maskfile is not None:
+        for line in open(maskfile, 'r').readlines():
+            line = line.strip().split()
+            ax_obs.axvspan(line[1], line[2], color='0.5', alpha=0.5)
     
     waverange = model['wav_obs'].max() - model['wav_obs'].min()
     crop_low = model['wav_obs'].min() + 0.05*waverange
