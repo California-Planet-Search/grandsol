@@ -39,7 +39,7 @@ def args():
                             help='Instrument string [HIRES or APF]',default="HIRES")
     parser.add_argument('--orders',dest='orders',action='store',
                         help='List of spectral orders to analyze.\
-                         [2,3,4,5,6,7,8,9,10]',default=[2,3,4,5,6,7,8,9,10])
+                         [2,3,4,5,6,7,8,9,10]',default=[2,3,4,5,6,7,8,9,10,11,13])
     parser.add_argument('--local', dest='local',action='store_true',
                         help='Run on local computer only. [True]',
                         default=True)
@@ -66,6 +66,9 @@ def args():
                           (i.e. time of transit). [None]""",
                         default=None, nargs=2, type=float,
                          metavar=('Period','Tc'))
+    parser.add_argument('--noplots', dest='notplots',
+                        action='store_true',
+                        help='No plots [False]', default=False)
     parser.add_argument('--plotres', dest='plotres',
                         action='store_true',
                         help='Plot residuals and evolution of\
@@ -90,6 +93,8 @@ def args():
                          for the template.', default=None)
     parser.add_argument('--fixtem', dest='fixtem',action='store_true',
                         help='Fix the template? [False]', default=False)
+    parser.add_argument('--mask', dest='mask',action='store',
+                        help='File containing mask', default=None)
 
     
     opt = parser.parse_args()

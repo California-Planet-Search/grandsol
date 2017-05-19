@@ -48,7 +48,7 @@ def execute(cmd, cwd, plotres):
 def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
                orders=[1,2,3,4,5,6,7,8,9,10,11,12], plotres=False,
                waveguess=None, fixwave=False, lsfguess=None, fixlsf=False,
-               temguess=None, fixtem=False):
+               temguess=None, fixtem=False, mask=None):
     """
     Run ``grand`` for several orders simultaneously.
 
@@ -107,9 +107,10 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
             cmd += " FIND_TEM-"
         else:
             cmd += " FIND_TEM+"
-
+        if mask is not None:
+            cmd += " XMASK+ MASK=%s" % mask
              
-        if overwrite or not os.path.isfile('order_%02d.done' % o):
+        if overwrite or (not os.path.isfile('order_%02d.done' % o) and not os.path.isfile(runname+".13.10.nim")):
             print "Running command: '%s'" % cmd
             if ppserver == None:
                 execute(cmd, cwd, plotres)
@@ -126,9 +127,10 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
             if errcode == 0:
                 good_orders.append(o)
                 modfile = "%s.%02d.99.mod" % (runname, o)
-                if os.path.isfile(modfile) and plotres:
+                if os.path.isfile(modfile) and plotres and not opt.noplots:
                     grandsol.plotting.plot_residuals_byobs(modfile,
-                                    outfile="%s_%02d_residuals.png" % (runname, o))
+                                    outfile="%s_%02d_residuals.png" % (runname, o),
+                                    maskfile=mask)
 
                 
     for o,job in zip(orders,jobs):
@@ -178,7 +180,7 @@ def run_iterations(opt, ppserver=None):
             obsdb = pd.read_csv(os.environ['GRAND_APF_OBSDB'], parse_dates=['midt'])
             ocols = df.columns
             merged = pd.merge(df, obsdb, on='obs', suffixes=['','_obsdb'])
-            merged = merged.query('phocount >= 1e7')
+            merged = merged.query('phocount >= 1e8')
             df = merged[ocols]
 
     runname = "iGrand_" + opt.star
@@ -223,18 +225,20 @@ def run_iterations(opt, ppserver=None):
                                         fudge=opt.fudge, plotres=opt.plotres,
                                         waveguess=opt.wave, fixwave=opt.fixwave,
                                         lsfguess=opt.lsf, fixlsf=opt.fixlsf,
-                                        temguess=opt.tem, fixtem=opt.fixtem)
+                                        temguess=opt.tem, fixtem=opt.fixtem,
+                                        mask=opt.mask)
 
-        grandsol.plotting.velplot_by_order(runname, obdf,
-                                           runorders,
-                                           outfile='iGrand_%s_velbyord.pdf'\
-                                            % opt.star)
-        grandsol.plotting.velplot_by_order(runname, obdf,
-                                           runorders,
-                                           outfile='iGrand_%s_bcbyord.pdf'\
-                                            % opt.star, vsbc=True)
+        if not opt.noplots:
+            grandsol.plotting.velplot_by_order(runname, obdf,
+                                               runorders,
+                                               outfile='iGrand_%s_velbyord.pdf'\
+                                                % opt.star)
+            grandsol.plotting.velplot_by_order(runname, obdf,
+                                               runorders,
+                                               outfile='iGrand_%s_bcbyord.pdf'\
+                                                % opt.star, vsbc=True)
 
-        if opt.truth:
+        if opt.truth and not opt.noplots:
             grandsol.plotting.compare_wls_byorder(runname,
                                                   obdf, datadir,
                                                   runorders)
@@ -246,7 +250,7 @@ def run_iterations(opt, ppserver=None):
         iterdone.append(n)
         os.chdir(rundir)
         
-        if len(joblist) > 0 or n == opt.niter:
+        if len(joblist) > 0 or n == opt.niter and not opt.noplots:
             vdf = grandsol.plotting.velplot_by_iter(runname,
                                               runorders,
                                               outfile='iGrand_%s_velbyiter.pdf'\
@@ -260,13 +264,13 @@ def run_iterations(opt, ppserver=None):
                                          outfile='iGrand_%s_iter%02d_velocities.txt'\
                                          % (opt.star, n))
 
-            if opt.truth:
+            if opt.truth and not opt.noplots:
                 grandsol.plotting.truthplot(runname,
                                             opt.truthvel,
                                             runorders,
                                             outfile='iGrand_%s_truth.pdf'\
                                              % opt.star, iters=iterdone)
-            if opt.phase != None:
+            if opt.phase != None and not opt.noplots:
                 grandsol.plotting.phaseplot_by_iter(runname,
                                                     obdf, runorders,
                                                     opt.phase[1], opt.phase[0],
@@ -274,11 +278,11 @@ def run_iterations(opt, ppserver=None):
                                                      % runname, iters=iterdone)
 
                 
-        if opt.plottemp:
+        if opt.plottemp and not opt.noplots:
             grandsol.plotting.plot_template_byiter(runname,
                                                    runorders, iters=iterdone)
 
-    if opt.plotres:
+    if opt.plotres and not opt.noplots:
         grandsol.plotting.plot_resMAD_byiter(runname, obdf, runorders,
                                              iters=iterdone,
                                              outfile="%s_resMAD_byiter.pdf"\

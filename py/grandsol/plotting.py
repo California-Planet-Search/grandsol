@@ -402,7 +402,7 @@ def plot_residuals_byobs(modfile, outfile=None, tellurics=False, iodine=False, m
     print "Plotting residuals contained in %s" % modfile
     
     model = grandsol.io.read_modfile(modfile)
-    order = int(modfile.split('.')[1])
+    order = int(os.path.basename(modfile).split('.')[1])
     
     model['residuals'] = (model['spec'] - (model['model']*model['cont'])) / model['smooth_cont']
     model['residuals_percent'] = model['residuals'].values * 100
@@ -444,7 +444,14 @@ def plot_residuals_byobs(modfile, outfile=None, tellurics=False, iodine=False, m
     if maskfile is not None:
         for line in open(maskfile, 'r').readlines():
             line = line.strip().split()
-            ax_obs.axvspan(line[1], line[2], color='0.5', alpha=0.5)
+            if len(line) < 3:
+                continue
+            if int(line[0]) == order or int(line[0]) == 0:
+                p1, p2 = line[1], line[2]
+                iw = np.interp([p1,p2], model['pixel'], model['wav_obs'])
+                print p1, p2, iw[0], iw[1]
+                ax_obs.axvspan(iw[0], iw[1], color='0.5', alpha=0.5)
+                #ax_obs.axvspan(line[1], line[2], color='0.5', alpha=0.5)
     
     waverange = model['wav_obs'].max() - model['wav_obs'].min()
     crop_low = model['wav_obs'].min() + 0.05*waverange
