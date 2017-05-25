@@ -132,10 +132,10 @@ if __name__ == '__main__':
 
     if not opt.local:
         server = pp.Server(ppservers=("*",),
-                           secret='gj3470b', ncpus=opt.ncpus)
+                           secret='gj3470b', ncpus=int(opt.ncpus))
         time.sleep(2)
     elif opt.local:
-        server = pp.Server(ncpus=opt.ncpus)
+        server = pp.Server(ncpus=int(opt.ncpus))
 
     nodes = server.get_active_nodes()
     print "Active nodes:\nServer                         \
