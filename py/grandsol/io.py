@@ -184,7 +184,8 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
     zarr = []
     warr = []
     for i,o in enumerate(orders):
-        vdf = grandsol.io.read_vel('%s.%02d.99.vel' % (runname,o))
+        fname = '%s.%02d.99.vel' % (runname,o)
+        vdf = grandsol.io.read_vel(fname)
 
         if (vdf['zn'] == vdf['z0']).all():
             print "io.combine_orders: WARNING: order %d velocities are all 0.0"\
