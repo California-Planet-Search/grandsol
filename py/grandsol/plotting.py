@@ -288,7 +288,8 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None,
             vdf['mnvel'] = binvels
             vdf['errvel'] = binerr
             vdf['bc_y'] = binbc
-            
+
+        
         velplot_mean(vdf, fmt='s', color=colors[i-1], vsbc=vsbc)
         #sigmas.append(np.std(vdf['mnvel']))
         sigmas.append(grandsol.utils.MAD(vdf['mnvel']))
