@@ -258,7 +258,8 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None,
         print idir
         if os.path.exists(idir):
             os.chdir(idir)
-            obdf = grandsol.io.read_obslist('obslist_%02d' % i)
+            obdf = grandsol.io.read_obslist(
+                'obslist_{:02d}.{:02d}'.format(i, orders[0]))
         else:
             print "WARNING: Could not read obslist_%02d" % i
             continue

@@ -45,7 +45,7 @@ def execute(cmd, cwd, plotres):
 
     return errcode
     
-def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
+def run_orders(runname, obslists, ppserver=None, overwrite=False, fudge=True,
                orders=[1,2,3,4,5,6,7,8,9,10,11,12], plotres=False,
                waveguess=None, fixwave=False, lsfguess=None, fixlsf=False,
                temguess=None, fixtem=False, mask=None):
@@ -54,7 +54,7 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
 
     Args:
         runname (string): name of current run
-        obslist (string): name of obslist file
+        obslists (list): name of obslist files for each order
         ppserver (pp.Server): Parallel Python server object to send jobs
         overwrite (bool): overwrite previous run?
         fudge (bool): Apply the fudge factor?
@@ -206,7 +206,7 @@ def run_iterations(opt, ppserver=None):
 
         oblists = []
         for o in runorders:
-            obfile = 'obslist_{:2d}.{:2d}'.format(n,o)
+            obfile = 'obslist_{:02d}.{:02d}'.format(n,o)
             oblists.append(obfile)
             
 
