@@ -54,7 +54,7 @@ def run_orders(runname, obslists, ppserver=None, overwrite=False, fudge=True,
 
     Args:
         runname (string): name of current run
-        obslists (list): name of obslist files for each order
+        obslists (list): name of obslist files (one per order)
         ppserver (pp.Server): Parallel Python server object to send jobs
         overwrite (bool): overwrite previous run?
         fudge (bool): Apply the fudge factor?
@@ -206,7 +206,7 @@ def run_iterations(opt, ppserver=None):
 
         oblists = []
         for o in runorders:
-            obfile = 'obslist_{:02d}.{:02d}'.format(n,o)
+            obfile = 'obslist_{:2d}.{:2d}'.format(n,o)
             oblists.append(obfile)
             
 
