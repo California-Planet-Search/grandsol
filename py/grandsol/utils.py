@@ -70,8 +70,11 @@ def clipped_mean(s, sigma=5, inweights=None, iterations=10, cenfunc=np.median, v
             w[bad] = 0
             weights[i,:] *= w
             if verbose: print "Masking %d bad measurements." % np.where(w==0)[0].shape[0]
-        
-            m = np.average(s, axis=0, weights=weights)
+
+            if np.sum(weights) == 0:
+                m = np.mean(s, axis=0)
+            else:
+                m = np.average(s, axis=0, weights=weights)
         
         ref = m.copy()
 

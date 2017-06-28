@@ -208,7 +208,8 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
     rv = relativity.RV(z=zarr)
     bc = relativity.RV(z=vdf['z0'].values)
     prev = relativity.RV(vel=obdf['vorb'].values)
-
+    err = relativity.RV(vel=vdf['uvbarn'].values)
+    
     relvel = (rv - bc) + prev
 
     #w = 1/warr.mean(axis=1)
@@ -225,6 +226,8 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
     
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])
+    if (vdf['errvel'] == 0).all():
+        vdf['errvel'] = err.vel
 
     obdf.ind = np.array(obdf.ind.values, dtype=int)
     mdf = pd.merge(vdf, obdf, left_index=True, right_on='ind')
