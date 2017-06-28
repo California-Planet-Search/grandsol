@@ -110,7 +110,7 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
         if mask is not None:
             cmd += " XMASK+ MASK=%s" % mask
              
-        if overwrite or (not os.path.isfile('order_%02d.done' % o) and not os.path.isfile(runname+".13.10.nim")):
+        if overwrite or (not os.path.isfile('order_%02d.done' % o) and not os.path.isfile(runname+".%02d.10.nim" % o)):
             print "Running command: '%s'" % cmd
             if ppserver == None:
                 execute(cmd, cwd, plotres)
@@ -118,12 +118,21 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
                 jobs.append(ppserver.submit(execute, (cmd,cwd,plotres),
                                             modules=('subprocess','os', 'time', 'grandsol')))
         else:
-            f = open('order_%02d.done' % o, 'r')
-            for l in f.readlines():
-                if l.startswith("return"):
-                    errcode = int(l.split(":")[-1])
-                    break
-            f.close()
+            try:
+                f = open('order_%02d.done' % o, 'r')
+                for l in f.readlines():
+                    if l.startswith("return"):
+                        errcode = int(l.split(":")[-1])
+                        break
+                f.close()
+            except IOError:
+                print "WARNING: could not find completion file"
+                if os.path.isfile(runname+".%02d.10.nim" % o):
+                    print "but found grand output file: %s.%02d.10.nim" % (runname, o)
+                    errcode = 0
+                else:
+                    raise(IOError)
+            
             if errcode == 0:
                 good_orders.append(o)
                 modfile = "%s.%02d.99.mod" % (runname, o)
@@ -135,8 +144,9 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
                 
     for o,job in zip(orders,jobs):
         e = job()
-        if e == 0: good_orders.append(o)
-        
+        if e == 0 or os.path.isfile(runname+".%02d.10.nim" % o):
+            good_orders.append(o)
+    
     ppserver.wait()            
 
     return good_orders, jobs
@@ -250,19 +260,21 @@ def run_iterations(opt, ppserver=None):
         iterdone.append(n)
         os.chdir(rundir)
         
-        if len(joblist) > 0 or n == opt.niter and not opt.noplots:
-            vdf = grandsol.plotting.velplot_by_iter(runname,
-                                              runorders,
-                                              outfile='iGrand_%s_velbyiter.pdf'\
-                                               % opt.star, iters=iterdone)
-            vdf = grandsol.plotting.velplot_by_iter(runname,
-                                              runorders,
-                                              outfile='iGrand_%s_bcbyiter.pdf'\
-                                               % opt.star, iters=iterdone, vsbc=True)
-
+        if len(joblist) > 0 or n == opt.niter:
             grandsol.io.write_velocities(vdf,
                                          outfile='iGrand_%s_iter%02d_velocities.txt'\
                                          % (opt.star, n))
+                                         
+            if not opt.noplots:
+                vdf = grandsol.plotting.velplot_by_iter(runname,
+                                                  runorders,
+                                                  outfile='iGrand_%s_velbyiter.pdf'\
+                                                   % opt.star, iters=iterdone)
+                vdf = grandsol.plotting.velplot_by_iter(runname,
+                                                  runorders,
+                                                  outfile='iGrand_%s_bcbyiter.pdf'\
+                                                   % opt.star, iters=iterdone, vsbc=True)
+            
 
             if opt.truth and not opt.noplots:
                 grandsol.plotting.truthplot(runname,
