@@ -206,7 +206,7 @@ def run_iterations(opt, ppserver=None):
 
         oblists = []
         for o in runorders:
-            obfile = 'obslist_{:2d}.{:2d}'.format(n,o)
+            obfile = 'obslist_{:02d}.{:02d}'.format(n,o)
             oblists.append(obfile)
             
 
