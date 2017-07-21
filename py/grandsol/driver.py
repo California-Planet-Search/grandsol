@@ -127,7 +127,7 @@ def run_orders(runname, obslists, ppserver=None, overwrite=False, fudge=True,
             if errcode == 0:
                 good_orders.append(o)
                 modfile = "%s.%02d.99.mod" % (runname, o)
-                if os.path.isfile(modfile) and plotres:
+                if os.path.isfile(modfile) and plotres and not opt.noplots:
                     grandsol.plotting.plot_residuals_byobs(modfile,
                                     outfile="%s_%02d_residuals.png" % (runname, o),
                                     maskfile=mask)
@@ -232,16 +232,17 @@ def run_iterations(opt, ppserver=None):
                                         temguess=opt.tem, fixtem=opt.fixtem,
                                         mask=opt.mask)
 
-        grandsol.plotting.velplot_by_order(runname, obdf,
+        if not opt.noplots:
+            grandsol.plotting.velplot_by_order(runname, obdf,
                                            runorders,
                                            outfile='iGrand_%s_velbyord.pdf'\
                                             % opt.star)
-        grandsol.plotting.velplot_by_order(runname, obdf,
+            grandsol.plotting.velplot_by_order(runname, obdf,
                                            runorders,
                                            outfile='iGrand_%s_bcbyord.pdf'\
                                             % opt.star, vsbc=True)
 
-        if opt.truth:
+        if opt.truth and not opt.noplots:
             grandsol.plotting.compare_wls_byorder(runname,
                                                   obdf, datadir,
                                                   runorders)
@@ -259,26 +260,28 @@ def run_iterations(opt, ppserver=None):
         os.chdir(rundir)
         
         if len(joblist) > 0 or n == opt.niter:
-            vdf = grandsol.plotting.velplot_by_iter(runname,
-                                              runorders,
-                                              outfile='iGrand_%s_velbyiter.pdf'\
-                                               % opt.star, iters=iterdone)
-            vdf = grandsol.plotting.velplot_by_iter(runname,
-                                              runorders,
-                                              outfile='iGrand_%s_bcbyiter.pdf'\
-                                               % opt.star, iters=iterdone, vsbc=True)
-
             grandsol.io.write_velocities(vdf,
                                          outfile='iGrand_%s_iter%02d_velocities.txt'\
                                          % (opt.star, n))
 
-            if opt.truth:
+            if not opt.noplots:
+                vdf = grandsol.plotting.velplot_by_iter(runname,
+                                              runorders,
+                                              outfile='iGrand_%s_velbyiter.pdf'\
+                                               % opt.star, iters=iterdone)
+                vdf = grandsol.plotting.velplot_by_iter(runname,
+                                              runorders,
+                                              outfile='iGrand_%s_bcbyiter.pdf'\
+                                               % opt.star, iters=iterdone, vsbc=True)
+
+
+            if opt.truth and not opt.noplots:
                 grandsol.plotting.truthplot(runname,
                                             opt.truthvel,
                                             runorders,
                                             outfile='iGrand_%s_truth.pdf'\
                                              % opt.star, iters=iterdone)
-            if opt.phase != None:
+            if opt.phase != None and not opt.noplots:
                 grandsol.plotting.phaseplot_by_iter(runname,
                                                     obdf, runorders,
                                                     opt.phase[1], opt.phase[0],
@@ -286,11 +289,11 @@ def run_iterations(opt, ppserver=None):
                                                      % runname, iters=iterdone)
 
                 
-        if opt.plottemp:
+        if opt.plottemp and not opt.noplots:
             grandsol.plotting.plot_template_byiter(runname,
                                                    runorders, iters=iterdone)
 
-    if opt.plotres:
+    if opt.plotres and not opt.noplots:
         grandsol.plotting.plot_resMAD_byiter(runname, obdf, runorders,
                                              iters=iterdone,
                                              outfile="%s_resMAD_byiter.pdf"\
