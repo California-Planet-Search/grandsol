@@ -3,7 +3,39 @@ import numpy as np
 import os
 from scipy.constants import c
 import grandsol.relativity as relativity
+import grandsol.rdsk as rdsk
 import grandsol
+
+def check_snr(obdf, ctslim=500, verbose=False):
+    """Check SNR for each observation in an obslist DataFrame
+
+    Check SNR for each observation in an obslist DataFrame.
+
+    Args:
+        obdf (DataFrame): obslist DataFrame
+        ctslim (float): (optional) Minimum limit in counts calculated as 
+            80th percentile of the mean flux over each order
+    
+    Returns:
+        DataFrame: stripped of low SNR observations
+    """
+    
+    datadir = os.environ['GRAND_DATADIR']
+
+    good = []
+    for i,row in obdf.iterrows():
+        ob = row['obs']
+        fpath = os.path.join(datadir, ob)
+        d = rdsk.Dskfile(fpath)
+        specarr = d.record(0)
+        order_means = specarr.mean(axis=1)
+        cts = np.percentile(order_means, 80)
+        if cts >= ctslim:
+            good.append(i)
+        if verbose:
+            print("{} {} {} {}".format(i, ob, fpath, cts))
+
+    return obdf.loc[good]
 
 def load_bc(bcfile):
     """
@@ -47,8 +79,11 @@ def get_observations(star, thin=999):
         np.random.seed(0)
         perm = np.random.permutation(len(star.obs.values))[:thin]
         star = star.iloc[perm].sort_values('jd').reset_index()
+
+    sdf = pd.DataFrame(star)
+    sdf = check_snr(sdf)
         
-    return pd.DataFrame(star)
+    return sdf
 
 def read_obslist(infile):
     """
