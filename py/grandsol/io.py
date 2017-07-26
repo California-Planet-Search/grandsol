@@ -223,7 +223,7 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
     #vdf['mnvel'] = np.median(relvel.values(), axis=0)
     vdf['mnvel'], weight_matrix = grandsol.utils.clipped_mean(relvel.values(),
                                                         inweights=w, sigma=4)
-    
+        
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])
     if (vdf['errvel'] == 0).all():
