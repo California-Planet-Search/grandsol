@@ -74,7 +74,11 @@ def clipped_mean(s, sigma=5, inweights=None, iterations=10, cenfunc=np.median, v
             if np.sum(weights) == 0:
                 m = np.mean(s, axis=0)
             else:
-                m = np.average(s, axis=0, weights=weights)
+                try:
+                    m = np.average(s, axis=0, weights=weights)
+                except ZeroDivisionError:
+                    print "WARNING: zero division detected in sigma-clipped mean calculation"
+                    m = np.mean(s, axis=0)
         
         ref = m.copy()
 
