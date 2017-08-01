@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 from scipy.constants import c
+from scipy.interpolate import interp1d
 import grandsol.relativity as relativity
 import grandsol.rdsk as rdsk
 import grandsol
@@ -187,7 +188,7 @@ def read_vel(infile):
     return zdf
 
 def combine_orders(runname, obdf, orders, varr_byorder=False,
-                       usevln=True, get_weights=False):
+                       usevln=True, get_weights=False, rv_fudge=True):
     """
     Combine velocities from multiple orders by mean and merge 
     with observation information.
@@ -203,6 +204,7 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
             calculate velocities
         get_weights (bool): (optional) return the weight matrix 
             instead of the velocities
+        rv_fudge (bool): (optional) apply the RV fudge factor
 
     Returns:
         DataFrame: Same as obdf with mean velocity (mnvel) and 
@@ -258,12 +260,26 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
     #vdf['mnvel'] = np.median(relvel.values(), axis=0)
     vdf['mnvel'], weight_matrix = grandsol.utils.clipped_mean(relvel.values(),
                                                         inweights=w, sigma=4)
-        
+    vdf['absvel'], weight_matrix = grandsol.utils.clipped_mean(rv.vel,
+                                                        inweights=w, sigma=4)
+
+    if rv_fudge:
+        x, y = np.genfromtxt(os.environ['GRAND']+'/py/rv_fudge_apf.csv',
+                                 delimiter=',', unpack=True)
+        absvel = vdf['absvel'].values
+        f = interp1d(x, y, kind='linear',
+                            fill_value=0.0,
+                            bounds_error=False)
+        corr = f(absvel)
+        vdf['mnvel'] -= corr
+    
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])
     if (vdf['errvel'] == 0).all():
         vdf['errvel'] = err.vel
 
+    
+        
     obdf.ind = np.array(obdf.ind.values, dtype=int)
     mdf = pd.merge(vdf, obdf, left_index=True, right_on='ind')
     
