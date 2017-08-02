@@ -271,7 +271,7 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
                             fill_value=0.0,
                             bounds_error=False)
         corr = f(absvel)
-        vdf['mnvel'] -= corr
+        vdf['mnvel_corr'] = vdf['mnvel'] - corr
     
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])
@@ -389,6 +389,6 @@ def write_velocities(df, outfile):
         df[new] = df[old]
         
     df.to_csv(outfile, sep=' ',
-              columns=['obs', 'jd', 'mnvel', 'errvel', 'bc'],
+              columns=['obs', 'jd', 'mnvel_corr', 'errvel', 'bc'],
               index=False)
 
