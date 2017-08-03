@@ -292,7 +292,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None,
         
         velplot_mean(vdf, fmt='s', color=colors[i-1], vsbc=vsbc)
         #sigmas.append(np.std(vdf['mnvel']))
-        sigmas.append(grandsol.utils.MAD(vdf['mnvel']))
+        sigmas.append(grandsol.utils.MAD(vdf['mnvel_corr']))
         
         os.chdir(workdir)
 
