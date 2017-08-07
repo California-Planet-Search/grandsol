@@ -136,7 +136,7 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
             if errcode == 0:
                 good_orders.append(o)
                 modfile = "%s.%02d.99.mod" % (runname, o)
-                if os.path.isfile(modfile) and plotres and not opt.noplots:
+                if os.path.isfile(modfile) and plotres:
                     grandsol.plotting.plot_residuals_byobs(modfile,
                                     outfile="%s_%02d_residuals.png" % (runname, o),
                                     maskfile=mask)
