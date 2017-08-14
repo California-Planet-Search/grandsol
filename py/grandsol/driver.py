@@ -48,7 +48,7 @@ def execute(cmd, cwd, plotres):
 def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
                orders=[1,2,3,4,5,6,7,8,9,10,11,12], plotres=False,
                waveguess=None, fixwave=False, lsfguess=None, fixlsf=False,
-               temguess=None, fixtem=False, mask=None):
+               temguess=None, fixtem=False, mask=None, rv_fudge=False):
     """
     Run ``grand`` for several orders simultaneously.
 
@@ -263,7 +263,7 @@ def run_iterations(opt, ppserver=None):
         if len(joblist) > 0 or n == opt.niter:
             grandsol.io.write_velocities(vdf,
                                          outfile='iGrand_%s_iter%02d_velocities.txt'\
-                                         % (opt.star, n))
+                                         % (opt.star, n), rv_fudge = opt.rvfudge)
                                          
             if not opt.noplots:
                 vdf = grandsol.plotting.velplot_by_iter(runname,

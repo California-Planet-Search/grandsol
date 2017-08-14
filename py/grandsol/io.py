@@ -188,7 +188,7 @@ def read_vel(infile):
     return zdf
 
 def combine_orders(runname, obdf, orders, varr_byorder=False,
-                       usevln=True, get_weights=False, rv_fudge=False):
+                       usevln=True, get_weights=False):
     """
     Combine velocities from multiple orders by mean and merge 
     with observation information.
@@ -204,7 +204,6 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
             calculate velocities
         get_weights (bool): (optional) return the weight matrix 
             instead of the velocities
-        rv_fudge (bool): (optional) apply the RV fudge factor
 
     Returns:
         DataFrame: Same as obdf with mean velocity (mnvel) and 
@@ -262,16 +261,6 @@ def combine_orders(runname, obdf, orders, varr_byorder=False,
                                                         inweights=w, sigma=4)
     vdf['absvel'], weight_matrix = grandsol.utils.clipped_mean(rv.vel,
                                                         inweights=w, sigma=4)
-
-    if rv_fudge:
-        x, y = np.genfromtxt(os.environ['GRAND']+'/py/rv_fudge_apf.csv',
-                                 delimiter=',', unpack=True)
-        absvel = vdf['absvel'].values
-        f = interp1d(x, y, kind='linear',
-                            fill_value=0.0,
-                            bounds_error=False)
-        corr = f(absvel)
-        vdf['mnvel_corr'] = vdf['mnvel'] - corr
     
     vdf['mnvel'] -= vdf['mnvel'].mean()
     vdf['errvel'] = relvel.values().std(axis=0) / np.sqrt(mnvel.shape[0])
@@ -374,21 +363,44 @@ def read_truth(tfile):
 
     return df
 
-def write_velocities(df, outfile):
+def write_velocities(df, outfile, rv_fudge=False):
     """
     Write velocities to a file
 
     Args:
         df (DataFrame): DataFrame output from `grandsol.io.combine_orders`
         outfile (string): Name of output file
+        rv_fudge (bool): (optional) apply the RV fudge factor and add the mnvel_corr
+            column
 
     """
 
     colmap = {'bc_x': 'bc'}
     for old,new in colmap.items():
         df[new] = df[old]
-        
+
+    if rv_fudge:
+        x, y = np.genfromtxt(os.environ['GRAND']+'/py/rv_fudge_apf.csv',
+                                 delimiter=',', unpack=True)
+
+        absvel = vdf['absvel'].values
+
+        # set RV fudge to zeros if outside limits derived
+        if min(x) > min(absvel) or max(x) < max(absvel):
+            y = np.zeros_like(absvel)
+            
+        f = interp1d(x, y, kind='linear',
+                            fill_value=0.0,
+                            bounds_error=False)
+        corr = f(absvel)
+        vdf['mnvel_corr'] = vdf['mnvel'] - corr
+
+        outcols = ['obs', 'jd', 'mnvel', 'errvel', 'bc', 'mnvel_corr']
+    else:
+        outcols = ['obs', 'jd', 'mnvel', 'errvel', 'bc']
+
+
     df.to_csv(outfile, sep=' ',
-              columns=['obs', 'jd', 'mnvel_corr', 'errvel', 'bc'],
-              index=False)
+                  columns=outcols,
+                  index=False)
 

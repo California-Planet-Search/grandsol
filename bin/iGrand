@@ -95,6 +95,9 @@ def args():
                         help='Fix the template? [False]', default=False)
     parser.add_argument('--mask', dest='mask',action='store',
                         help='File containing mask', default=None)
+    parser.add_argument('--rvfudge', dest='rvfudge',action='store_true',
+                        help='Apply the RV (or double) fudge?')
+
 
     
     opt = parser.parse_args()
@@ -118,7 +121,10 @@ def args():
         os.environ['GRAND_DATADIR'] = os.environ['GRAND_DATADIR_APF']
         if opt.wave is None:
             opt.wave = os.path.join(os.environ['GRAND_REFDIR'], 'apf_crop.wls_FIX')
-
+    else:
+        opt.rvfudge = False
+        
+            
     return opt
 
 

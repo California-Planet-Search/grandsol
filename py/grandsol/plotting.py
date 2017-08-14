@@ -109,10 +109,10 @@ def velplot_mean(vdf, fmt='s', color='k', vsbc=False):
         None
     """
     if vsbc:
-        pl.errorbar(vdf['bc_y'], vdf['mnvel_corr'], yerr=vdf['errvel'], fmt=fmt, color=color, markersize=10, markeredgewidth=1)
+        pl.errorbar(vdf['bc_y'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, color=color, markersize=10, markeredgewidth=1)
         pl.xlabel('BC [m s$^{-1}$]')
     else:
-        pl.errorbar(vdf['jd'], vdf['mnvel_corr'], yerr=vdf['errvel'], fmt=fmt, color=color, markersize=10, markeredgewidth=1)
+        pl.errorbar(vdf['jd'], vdf['mnvel'], yerr=vdf['errvel'], fmt=fmt, color=color, markersize=10, markeredgewidth=1)
         pl.xlabel('HJD$_{\\rm UTC}$ - 2440000')
 
     pl.ylabel('RV [m s$^{-1}$]')
@@ -275,7 +275,7 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None,
 
         if binsize > 0.0:
             bintimes, binvels, binerr = grandsol.utils.timebin(vdf['jd'].values,
-                                                               vdf['mnvel_corr'].values,
+                                                               vdf['mnvel'].values,
                                                                vdf['errvel'].values,
                                                                binsize=binsize)
             _, binbc, _ = grandsol.utils.timebin(vdf['jd'].values,
@@ -285,14 +285,14 @@ def velplot_by_iter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10], outfile=None,
 
             vdf = pd.DataFrame([])
             vdf['jd'] = bintimes
-            vdf['mnvel_corr'] = binvels
+            vdf['mnvel'] = binvels
             vdf['errvel'] = binerr
             vdf['bc_y'] = binbc
 
         
         velplot_mean(vdf, fmt='s', color=colors[i-1], vsbc=vsbc)
         #sigmas.append(np.std(vdf['mnvel']))
-        sigmas.append(grandsol.utils.MAD(vdf['mnvel_corr']))
+        sigmas.append(grandsol.utils.MAD(vdf['mnvel']))
         
         os.chdir(workdir)
 
