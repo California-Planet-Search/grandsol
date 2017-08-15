@@ -387,7 +387,7 @@ def write_velocities(df, outfile, rv_fudge=False):
 
         # set RV fudge to zeros if outside limits derived
         if min(x) > min(absvel) or max(x) < max(absvel):
-            y = np.zeros_like(absvel)
+            y = np.zeros_like(x)
             
         f = interp1d(x, y, kind='linear',
                             fill_value=0.0,
