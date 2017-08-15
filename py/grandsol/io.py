@@ -393,7 +393,7 @@ def write_velocities(df, outfile, rv_fudge=False):
                             fill_value=0.0,
                             bounds_error=False)
         corr = f(absvel)
-        vdf['mnvel_corr'] = vdf['mnvel'] - corr
+        df['mnvel_corr'] = vdf['mnvel'] - corr
 
         outcols = ['obs', 'jd', 'mnvel', 'errvel', 'bc', 'mnvel_corr']
     else:

@@ -261,10 +261,6 @@ def run_iterations(opt, ppserver=None):
         os.chdir(rundir)
         
         if len(joblist) > 0 or n == opt.niter:
-            grandsol.io.write_velocities(vdf,
-                                         outfile='iGrand_%s_iter%02d_velocities.txt'\
-                                         % (opt.star, n), rv_fudge = opt.rvfudge)
-                                         
             if not opt.noplots:
                 vdf = grandsol.plotting.velplot_by_iter(runname,
                                                   runorders,
@@ -293,7 +289,11 @@ def run_iterations(opt, ppserver=None):
         if opt.plottemp and not opt.noplots:
             grandsol.plotting.plot_template_byiter(runname,
                                                    runorders, iters=iterdone)
-
+        
+        grandsol.io.write_velocities(vdf,
+                                         outfile='iGrand_%s_iter%02d_velocities.txt'\
+                                         % (opt.star, n), rv_fudge = opt.rvfudge)
+            
     if opt.plotres and not opt.noplots:
         grandsol.plotting.plot_resMAD_byiter(runname, obdf, runorders,
                                              iters=iterdone,
