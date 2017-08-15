@@ -383,7 +383,7 @@ def write_velocities(df, outfile, rv_fudge=False):
         x, y = np.genfromtxt(os.environ['GRAND']+'/py/rv_fudge_apf.csv',
                                  delimiter=',', unpack=True)
 
-        absvel = vdf['absvel'].values
+        absvel = df['absvel'].values
 
         # set RV fudge to zeros if outside limits derived
         if min(x) > min(absvel) or max(x) < max(absvel):
