@@ -136,7 +136,7 @@ def write_obslist(df, sysvel, datadir, outfile='obslist',
     if 'vorb' not in df.columns or isinstance(vorb, type(None)):
         df['vorb'] = 0
     else:
-        df['vorb'] = vorb.values
+        df.loc[:,'vorb'] = vorb.values
 
     odf = df.sort_values('jd').reset_index(drop=True)
     odf['ind'] = odf.index.values + 1
@@ -312,7 +312,8 @@ def read_temfile(temfile):
     """
 
     temp = pd.read_csv(temfile, sep=' ', skipinitialspace=True,
-                           names=['inode', 'wav', 'temp', 'temp_prev', 'solar'])
+                           names=['inode', 'wav', 'temp', 'temp_prev', 'solar'],
+                           na_values='********')
     
     temp.drop_duplicates(subset=['temp', 'temp_prev'],
                              inplace=True, keep=False)
