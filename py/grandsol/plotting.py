@@ -404,7 +404,7 @@ def plot_residuals_byobs(modfile, outfile=None, tellurics=False, iodine=False, m
     
     model = grandsol.io.read_modfile(modfile)
     order = int(os.path.basename(modfile).split('.')[1])
-    
+
     model['residuals'] = (model['spec'] - (model['model']*model['cont'])) / model['smooth_cont']
     model['residuals_percent'] = model['residuals'].values * 100
     

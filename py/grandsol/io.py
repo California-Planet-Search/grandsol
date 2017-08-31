@@ -294,8 +294,10 @@ def read_modfile(modfile):
                         names=['ind', 'order', 'pixel', 'spec',
                                 'model', 'wav_obs', 'wav_star', 'cont',
                                 'smooth_cont', 'badflag', 'tellflag',
-                                'metflag'])
+                                'metflag'], na_values='********')
 
+    model['model'] = model['model'].astype(float)
+    
     return model
 
 def read_temfile(temfile):
@@ -393,7 +395,7 @@ def write_velocities(df, outfile, rv_fudge=False):
                             fill_value=0.0,
                             bounds_error=False)
         corr = f(absvel)
-        df['mnvel_corr'] = vdf['mnvel'] - corr
+        df['mnvel_corr'] = df['mnvel'] - corr
 
         outcols = ['obs', 'jd', 'mnvel', 'errvel', 'bc', 'mnvel_corr']
     else:
