@@ -5,7 +5,7 @@ import grandsol
 import time
 import pandas as pd
 import numpy as np
-from glob import glob
+
 
 def execute(cmd, cwd, plotres):
     """
@@ -24,11 +24,10 @@ def execute(cmd, cwd, plotres):
     os.chdir(cwd)
     o = int(cmd.split()[3])
     runname = cmd.split()[2]
-    lock = subprocess.Popen(["echo 'Start Time: '`date` > order_%02d.run" % o],
-                             shell=True)
+    _ = subprocess.Popen(["echo 'Start Time: '`date` > order_%02d.run" % o], shell=True)
 
     p = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
+    _, _ = p.communicate()
     errcode = p.returncode
 
     modfile = "%s.%02d.99.mod" % (runname, o)
@@ -36,53 +35,54 @@ def execute(cmd, cwd, plotres):
         grandsol.plotting.plot_residuals_byobs(modfile,
                                                outfile="%s_%02d_residuals.png" % (runname, o))
     
-    lock = subprocess.Popen(
-        ["echo 'End Time: '`date`'\nreturn code: %s' >> order_%02d.run" \
-         % (errcode,o)], shell=True)
+    _ = subprocess.Popen(
+        ["echo 'End Time: '`date`'\nreturn code: %s' >> order_%02d.run"
+         % (errcode, o)], shell=True)
     time.sleep(2)
-    lock = subprocess.Popen(["mv order_%02d.run order_%02d.done" % (o,o)],
-                             shell=True)
+    _ = subprocess.Popen(["mv order_%02d.run order_%02d.done" % (o, o)], shell=True)
 
     return errcode
-    
+
+
 def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
-               orders=[1,2,3,4,5,6,7,8,9,10,11,12], plotres=False,
+               orders=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], plotres=False,
                waveguess=None, fixwave=False, lsfguess=None, fixlsf=False,
-               temguess=None, fixtem=False, mask=None, rv_fudge=False):
+               temguess=None, fixtem=False, mask=None):
     """
     Run ``grand`` for several orders simultaneously.
 
     Args:
         runname (string): name of current run
         obslist (string): name of obslist file
-        ppserver (pp.Server): Parallel Python server object to send jobs
-        overwrite (bool): overwrite previous run?
-        fudge (bool): Apply the fudge factor?
-        orders (list): list of orders to be run
-        plotres (bool): make the residual plots?
-        waveguess (string): Path to input wavelength solution file
-        fixwave (bool): Fix the wavelength solution?
-        lsfguess (bool): Path to input LSF guess file
-        fixlsf (bool): Fix the wavelength solution?
-        temguess (bool): Path to input template guess file
-        fixtem (bool): Fix the template?
-
+        ppserver (pp.Server): (optional) Parallel Python server object to send jobs
+        overwrite (bool): (optional) overwrite previous run?
+        fudge (bool): (optional) Apply the fudge factor?
+        orders (list): (optional) list of orders to be run
+        plotres (bool): (optional) make the residual plots?
+        waveguess (string): (optional) Path to input wavelength solution file
+        fixwave (bool): (optional) Fix the wavelength solution?
+        lsfguess (bool): (optional) Path to input LSF guess file
+        fixlsf (bool): (optional) Fix the wavelength solution?
+        temguess (bool): (optional) Path to input template guess file
+        fixtem (bool): (optional) Fix the template?
+        mask (string): (optional) Path to telluric mask file
 
     Returns:
-        tuple: orders that succesfully finished, and the list of jobs sent
+        tuple: orders that successfully finished, and the list of jobs sent
 
     """
     
-    
     jobs = []
     good_orders = []
-    for o in orders:
+    for i, o in enumerate(orders):
         cwd = os.getcwd()
         cmd = "%s/grand %s %s %d 111111 out=%s.%02d.log vorb+ nitf=10" \
-          % (os.environ['GRAND_BINDIR'], obslist, runname, o, runname, o)
+              % (os.environ['GRAND_BINDIR'], obslist, runname, o, runname, o)
 
-        if fudge: cmd += " fudge+"
-        else: cmd += " fudge-"
+        if fudge:
+            cmd += " fudge+"
+        else:
+            cmd += " fudge-"
 
         if waveguess is not None:
             shutil.copy(waveguess, cwd)
@@ -101,8 +101,8 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
             cmd += " FIND_LSF+"
 
         if temguess is not None:
-            shutil.copy(temguess, cwd)
-            cmd += " file_tem=%s" % os.path.basename(temguess)
+            shutil.copy(temguess[i], cwd)
+            cmd += " file_tem=%s" % os.path.basename(temguess[i])
         if fixtem:
             cmd += " FIND_TEM-"
         else:
@@ -112,11 +112,11 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
              
         if overwrite or (not os.path.isfile('order_%02d.done' % o) and not os.path.isfile(runname+".%02d.10.nim" % o)):
             print "Running command: '%s'" % cmd
-            if ppserver == None:
+            if ppserver is None:
                 execute(cmd, cwd, plotres)
             else:
-                jobs.append(ppserver.submit(execute, (cmd,cwd,plotres),
-                                            modules=('subprocess','os', 'time', 'grandsol')))
+                jobs.append(ppserver.submit(execute, (cmd, cwd, plotres),
+                                            modules=('subprocess', 'os', 'time', 'grandsol')))
         else:
             try:
                 f = open('order_%02d.done' % o, 'r')
@@ -131,18 +131,17 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
                     print "but found grand output file: %s.%02d.10.nim" % (runname, o)
                     errcode = 0
                 else:
-                    raise(IOError)
+                    raise IOError
             
             if errcode == 0:
                 good_orders.append(o)
                 modfile = "%s.%02d.99.mod" % (runname, o)
                 if os.path.isfile(modfile) and plotres:
-                    grandsol.plotting.plot_residuals_byobs(modfile,
-                                    outfile="%s_%02d_residuals.png" % (runname, o),
-                                    maskfile=mask)
+                    grandsol.plotting.plot_residuals_byobs(modfile, outfile="%s_%02d_residuals.png" % (runname, o),
+                                                           maskfile=mask)
 
                 
-    for o,job in zip(orders,jobs):
+    for o, job in zip(orders, jobs):
         e = job()
         if e == 0 or os.path.isfile(runname+".%02d.10.nim" % o):
             good_orders.append(o)
@@ -150,7 +149,8 @@ def run_orders(runname, obslist, ppserver=None, overwrite=False, fudge=True,
     ppserver.wait()            
 
     return good_orders, jobs
-            
+
+
 def run_iterations(opt, ppserver=None):
     """
     Run ``iGrand`` iterations
@@ -170,7 +170,7 @@ def run_iterations(opt, ppserver=None):
         f = open(opt.obslist, 'r')
         for l in f.readlines():
             if l.startswith('RJDIR'):
-                datadir = l.split('=')[1].strip().replace('"','')
+                datadir = l.split('=')[1].strip().replace('"', '')
             if l.startswith('VSYST'):
                 opt.sysvel = float(l.split('=')[1].split()[0])
         f.close()
@@ -186,10 +186,10 @@ def run_iterations(opt, ppserver=None):
         # datasets that causes grand to freeze
         if opt.inst == 'APF':
             assert 'GRAND_APF_OBSDB' in os.environ.keys(),\
-"When analyzing APF data you must specify GRAND_APF_OBSDB in your environment."
+                "When analyzing APF data you must specify GRAND_APF_OBSDB in your environment."
             obsdb = pd.read_csv(os.environ['GRAND_APF_OBSDB'], parse_dates=['midt'])
             ocols = df.columns
-            merged = pd.merge(df, obsdb, on='obs', suffixes=['','_obsdb'])
+            merged = pd.merge(df, obsdb, on='obs', suffixes=['', '_obsdb'])
             merged = merged.query('phocount >= 1e8')
             df = merged[ocols]
 
@@ -215,7 +215,6 @@ def run_iterations(opt, ppserver=None):
         os.chdir(idir)
         obfile = 'obslist_%02d' % n
 
-        
         if i == 0:
             vorb = pd.Series(np.zeros_like(df['jd']))
             obdf = grandsol.io.write_obslist(df, opt.sysvel,
@@ -241,62 +240,52 @@ def run_iterations(opt, ppserver=None):
         if not opt.noplots:
             grandsol.plotting.velplot_by_order(runname, obdf,
                                                runorders,
-                                               outfile='iGrand_%s_velbyord.pdf'\
-                                                % opt.star)
+                                               outfile='iGrand_%s_velbyord.pdf' % opt.star)
             grandsol.plotting.velplot_by_order(runname, obdf,
                                                runorders,
-                                               outfile='iGrand_%s_bcbyord.pdf'\
-                                                % opt.star, vsbc=True)
+                                               outfile='iGrand_%s_bcbyord.pdf' % opt.star, vsbc=True)
 
         if opt.truth and not opt.noplots:
             grandsol.plotting.compare_wls_byorder(runname,
                                                   obdf, datadir,
                                                   runorders)
 
-        vdf, mnvel = grandsol.io.combine_orders(runname, obdf,
-                                        runorders, varr_byorder=True)
+        vdf, mnvel = grandsol.io.combine_orders(runname, obdf, runorders, varr_byorder=True)
 
-            
         iterdone.append(n)
         os.chdir(rundir)
         
         if len(joblist) > 0 or n == opt.niter:
             if not opt.noplots:
                 vdf = grandsol.plotting.velplot_by_iter(runname,
-                                                  runorders,
-                                                  outfile='iGrand_%s_velbyiter.pdf'\
-                                                   % opt.star, iters=iterdone)
+                                                        runorders,
+                                                        outfile='iGrand_%s_velbyiter.pdf' % opt.star, iters=iterdone)
                 vdf = grandsol.plotting.velplot_by_iter(runname,
-                                                  runorders,
-                                                  outfile='iGrand_%s_bcbyiter.pdf'\
-                                                   % opt.star, iters=iterdone, vsbc=True)
-            
+                                                        runorders,
+                                                        outfile='iGrand_%s_bcbyiter.pdf' % opt.star, iters=iterdone,
+                                                        vsbc=True)
 
             if opt.truth and not opt.noplots:
                 grandsol.plotting.truthplot(runname,
                                             opt.truthvel,
                                             runorders,
-                                            outfile='iGrand_%s_truth.pdf'\
-                                             % opt.star, iters=iterdone)
-            if opt.phase != None and not opt.noplots:
+                                            outfile='iGrand_%s_truth.pdf' % opt.star, iters=iterdone)
+            if opt.phase is not None and not opt.noplots:
                 grandsol.plotting.phaseplot_by_iter(runname,
                                                     obdf, runorders,
                                                     opt.phase[1], opt.phase[0],
-                                                    outfile='%s_phase.pdf'\
-                                                     % runname, iters=iterdone)
+                                                    outfile='%s_phase.pdf' % runname, iters=iterdone)
 
-                
         if opt.plottemp and not opt.noplots:
             grandsol.plotting.plot_template_byiter(runname,
                                                    runorders, iters=iterdone)
         
         grandsol.io.write_velocities(vdf,
-                                         outfile='iGrand_%s_iter%02d_velocities.txt'\
-                                         % (opt.star, n), rv_fudge = opt.rvfudge)
+                                     outfile='iGrand_%s_iter%02d_velocities.txt'
+                                     % (opt.star, n), rv_fudge=opt.rvfudge)
             
     if opt.plotres and not opt.noplots:
         grandsol.plotting.plot_resMAD_byiter(runname, obdf, runorders,
                                              iters=iterdone,
-                                             outfile="%s_resMAD_byiter.pdf"\
-                                              % runname)
-
+                                             outfile="%s_resMAD_byiter.pdf"
+                                             % runname)

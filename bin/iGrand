@@ -3,7 +3,6 @@
 import os
 import sys
 import argparse
-import subprocess
 
 import pp
 
@@ -17,55 +16,52 @@ def args():
     
     parser = argparse.ArgumentParser(
         description='Run iterative Grand Solution doppler analysis.')
-    parser.add_argument(metavar='star',dest='star',action='store',
+    parser.add_argument(metavar='star', dest='star', action='store',
                         help='Star to analyze.', type=str)
-    parser.add_argument(metavar='sysvel',dest='sysvel',action='store',
+    parser.add_argument(metavar='sysvel', dest='sysvel', action='store',
                         help='Systemic radial velocity of star.\
                          This parameter is not needed and ignored\
                           if an input obslist is given.',
                         nargs='?', default=None, type=float)
-    parser.add_argument('--obslist',dest='obslist',action='store',
+    parser.add_argument('--obslist', dest='obslist', action='store',
                         help='Use existing obslist file instead of\
                          creating one from observations found in kbcvel.ascii',
                         default=None, type=str)
     parser.add_argument('-o', '--overwrite', dest='overwrite',
                         action='store_true',
-                        help='Overwrite previous run [False]',default=False)
-    parser.add_argument('--nofudge', dest='nofudge',action='store_true',
-                        help='Do not apply the fudge [False]',default=False)
-    parser.add_argument('--meteor', dest='meteor',action='store',
-                        help='Path to meteor file [None]',default=None)
-    parser.add_argument('--inst', dest='inst',action='store',
-                            help='Instrument string [HIRES or APF]',default="HIRES")
-    parser.add_argument('--orders',dest='orders',action='store',
+                        help='Overwrite previous run [False]', default=False)
+    parser.add_argument('--nofudge', dest='nofudge', action='store_true',
+                        help='Do not apply the fudge [False]', default=False)
+    parser.add_argument('--meteor', dest='meteor', action='store',
+                        help='Path to meteor file [None]', default=None)
+    parser.add_argument('--inst', dest='inst', action='store',
+                        help='Instrument string [HIRES or APF]', default="HIRES")
+    parser.add_argument('--orders', dest='orders', action='store',
                         help='List of spectral orders to analyze.\
-                         [2,3,4,5,6,7,8,9,10]',default=[2,3,4,5,6,7,8,9,10,11,13])
-    parser.add_argument('--local', dest='local',action='store_true',
-                        help='Run on local computer only. [True]',
-                        default=True)
-    parser.add_argument('--ncpus',dest='ncpus',action='store',
+                         [2,3,4,5,6,7,8,9,10]', default=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13])
+    parser.add_argument('--ncpus', dest='ncpus', action='store',
                         help='Number of local CPUs to utilize.\
-                         [autodetect]',default='autodetect')
-    parser.add_argument('--thin',dest='thin',action='store',
+                         [autodetect]', default='autodetect')
+    parser.add_argument('--thin', dest='thin', action='store',
                         help='Maximum number of observations,\
                          selected at random from full observation list.',
                         default=99999, type=int)                     
-    parser.add_argument('--niter',dest='niter',action='store',
+    parser.add_argument('--niter', dest='niter', action='store',
                         help='Number of outer loop iterations. [10]',
                         default=10, type=int)
-    parser.add_argument('--truth', dest='truth',action='store_true',
+    parser.add_argument('--truth', dest='truth', action='store_true',
                         help='Set this flag if "truth" velocities\
                          are given in the input obslist.This will\
                           create a few extra plots [False]',
                         default=False)
-    parser.add_argument('--phase', dest='phase',action='store',
+    parser.add_argument('--phase', dest='phase', action='store',
                         help="""Plot phase-folded velocities\
-                         and best-fit orbital model.
+                        and best-fit orbital model.
                         Two arguments must follow this flag:\
-                         period and time of inferior conjunction\
-                          (i.e. time of transit). [None]""",
+                        period and time of inferior conjunction\
+                        (i.e. time of transit). [None]""",
                         default=None, nargs=2, type=float,
-                         metavar=('Period','Tc'))
+                        metavar=('Period', 'Tc'))
     parser.add_argument('--noplots', dest='noplots',
                         action='store_true',
                         help='No plots [False]', default=False)
@@ -76,37 +72,37 @@ def args():
     parser.add_argument('--plottemp', dest='plottemp',
                         action='store_true',
                         help='Plot template and evolution. [False]',
-                         default=False)
-    parser.add_argument('--wave', dest='wave',action='store',
+                        default=False)
+    parser.add_argument('--wave', dest='wave', action='store',
                         help='File containing the initial guess\
                          for wavelength solution.', default=None)
-    parser.add_argument('--fixwave', dest='fixwave',action='store_true',
+    parser.add_argument('--fixwave', dest='fixwave', action='store_true',
                         help='Fix the wavelength solution? [False]',
-                         default=False)
-    parser.add_argument('--lsf', dest='lsf',action='store',
+                        default=False)
+    parser.add_argument('--lsf', dest='lsf', action='store',
                         help='File containing the initial guess for the LSF.',
                         default=None)
-    parser.add_argument('--fixlsf', dest='fixlsf',action='store_true',
+    parser.add_argument('--fixlsf', dest='fixlsf', action='store_true',
                         help='Fix the LSF? [False]', default=False)
-    parser.add_argument('--tem', dest='tem',action='store',
-                        help='File containing the initial guess\
-                         for the template.', default=None)
-    parser.add_argument('--fixtem', dest='fixtem',action='store_true',
+    parser.add_argument('--tem', dest='tem', action='store',
+                        help='Files containing the initial guess\
+                        for the template. Number of files must match number of orders',
+                        default=None, nargs="+")
+    parser.add_argument('--fixtem', dest='fixtem', action='store_true',
                         help='Fix the template? [False]', default=False)
-    parser.add_argument('--mask', dest='mask',action='store',
+    parser.add_argument('--mask', dest='mask', action='store',
                         help='File containing mask', default=None)
-    parser.add_argument('--rvfudge', dest='rvfudge',action='store_true',
+    parser.add_argument('--rvfudge', dest='rvfudge', action='store_true',
                         help='Apply the RV (or double) fudge?')
 
-
-    
     opt = parser.parse_args()
-    if isinstance(opt.orders, str): opt.orders=eval(opt.orders)
-    assert (opt.obslist != None) or (opt.sysvel != None),\
+    if isinstance(opt.orders, str):
+        opt.orders = eval(opt.orders)
+    assert (opt.obslist is not None) or (opt.sysvel is not None),\
         "Must give either systemic velocity or input obslist."
-    opt.fudge = opt.nofudge == False
+    opt.fudge = opt.nofudge is False
 
-    if opt.obslist != None and opt.truth:
+    if opt.obslist is not None and opt.truth:
         opt.truthvel = grandsol.io.read_obslist(
             os.path.abspath(opt.obslist))['vorb']
 
@@ -123,8 +119,11 @@ def args():
             opt.wave = os.path.join(os.environ['GRAND_REFDIR'], 'apf_crop.wls_FIX')
     else:
         opt.rvfudge = False
-        
-            
+
+    if opt.tem is not None:
+        tmpfiles = [os.path.abspath(t) for t in opt.tem]
+        opt.tem = tmpfiles
+
     return opt
 
 
@@ -141,27 +140,15 @@ if __name__ == '__main__':
     except ValueError:
         ncpus = "autodetect"
 
-    if not opt.local:
-        server = pp.Server(ppservers=("*",),
-                           secret='gj3470b', ncpus=ncpus)
-        time.sleep(2)
-    elif opt.local:
-        server = pp.Server(ncpus=ncpus)
+    server = pp.Server(ncpus=ncpus)
 
     nodes = server.get_active_nodes()
     print "Active nodes:\nServer                         \
     NCPUS\n-------------------------------------"
     for n in nodes.keys():
-        try:
-            host = socket.gethostbyaddr(n.split(":")[0])[0]
-        except:
-            host = n.split(":")[0]
+        host = n.split(":")[0]
         print "%s\t%s" % (host.ljust(30), nodes[n])
     print "-------------------------------------\n"
 
-    
     print "Running iGrand for star:", opt.star
     grandsol.driver.run_iterations(opt, server)
-    
-
-        

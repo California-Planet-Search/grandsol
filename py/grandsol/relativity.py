@@ -52,7 +52,9 @@ class RV():
         z (float or array): Z or array of Z where :math:`Z = v/c`
 
     Note:
-        * ``__add__``, ``__sub__``, ``__mul__``, and ``__div__`` handle the +, -, *, and / operators respectively and return new RV objects with the relativistic arithmatic performed on the original RV.vel objects
+        * ``__add__``, ``__sub__``, ``__mul__``, and ``__div__`` handle the +, -, *,
+        and / operators respectively and return new RV objects with the relativistic
+        arithmatic performed on the original RV.vel objects
         * Cannot define `both` vel and z when constructing the RV object
     
     Attributes:
@@ -69,8 +71,10 @@ class RV():
     def __init__(self, vel=None, z=None):
         if vel is not None: self.vel = vel
         if z is not None: self.vel = z2v(z)  
-        if (vel is None) and (z is None): raise ValueError, "vel or z must be specified when constructing RV object"
-        if (vel is not None) and (z is not None): raise ValueError, "cannot specifiy both vel and z when constructing RV object"
+        if (vel is None) and (z is None): raise ValueError, \
+            "vel or z must be specified when constructing RV object"
+        if (vel is not None) and (z is not None): raise ValueError, \
+            "cannot specifiy both vel and z when constructing RV object"
 
     def __repr__(self):
         return "<RV Object>\n%s" % repr(self.vel).replace("<RV Object>\n","")

@@ -555,7 +555,7 @@ def plot_template_byiter(runname, orders, iters=[1,2,3,4,5,6,7,8,9,10]):
     
     pl.clf()
     
-    zoomwidth = 5.0
+    zoomwidth = 2.0
     
     def _specplot(temp):
         pl.plot(temp['wav'], temp['solar'], '-', color='b', alpha=0.3, lw=2)
