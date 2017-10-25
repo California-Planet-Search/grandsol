@@ -389,8 +389,8 @@ c  _SDIM_ : the total number of template nodes ---> 45000
 c _LWSTEP_: the node spacing in velocity/c
 c   _WWO_ : the velocity at s = 1
 c
-#define _SDIM_   30000
-#define _LWSTEP_ 6.0d-6
+#define _SDIM_   60000
+#define _LWSTEP_ 3.0d-6
 #define _WW0_    5000.0d0
  
  
@@ -1534,10 +1534,10 @@ c
      .                             lsfjim(1,1,m),coeffw)
                    call wavi2wavk(wav_imn(1,m,n),
      .                            wav_kmn(1,m,n))
-                   do k = 1, 9 
-                      write(*,'(''NNIT='',i2,'' k='',i1,1x,9f15.8)')
-     .                      NNIT,k,wav_kmn(k,m,n)
-                      enddo
+c                   do k = 1, 9 
+c                      write(*,'(''NNIT='',i2,'' k='',i1,1x,9f15.8)')
+c     .                      NNIT,k,wav_kmn(k,m,n)
+c                      enddo
                    endif
 
                call find_ftso(ftso,wav_imn(1,m,n))
