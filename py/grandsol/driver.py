@@ -190,7 +190,7 @@ def run_iterations(opt, ppserver=None):
             obsdb = pd.read_csv(os.environ['GRAND_APF_OBSDB'], parse_dates=['midt'])
             ocols = df.columns
             merged = pd.merge(df, obsdb, on='obs', suffixes=['', '_obsdb'])
-            merged = merged.query('phocount >= 1e8')
+            # merged = merged.query('phocount >= 1e8')
             df = merged[ocols]
 
     runname = "iGrand_" + opt.star
