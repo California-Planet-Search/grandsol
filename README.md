@@ -1,7 +1,7 @@
 This directory contains grand solution software, which deduces stellar
 parameters by fitting stellar spectra obtained with an iodine cell.
 
-Documentation (in progress) is available at http://pydocs.ddns.net/grandsol
+Documentation (in progress) is available at http://cadence.caltech.edu/~bfulton/pydocs/grandsol/
 
 The fitting code 'grandsol/fort/grand' determines:
   intrinsic stellar spectrum (a.k.a. deconvolved template)
